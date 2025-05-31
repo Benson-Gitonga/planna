@@ -1,8 +1,8 @@
 import express from "express";
 import pg from "pg"
 import nodemailer from "nodemailer";
-import bcrypt from "bcrypt";
-import session from "session";
+import bcrypt from "bcryptjs";
+import session from "express-session";
 import env from "dotenv";
 env.config();
 
