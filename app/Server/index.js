@@ -10,6 +10,7 @@ const app = express();
 //Port server will be running 
 const  serverport = 5000;
 app.use(express.json());
+//Database connection
 
 
 
