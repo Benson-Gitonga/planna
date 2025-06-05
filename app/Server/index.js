@@ -4,12 +4,17 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import env from "dotenv";
+import csv from "csv-parser";
+import multer from "multer";
+import cors from "cors";
+import {PassThrough} from "stream";
 env.config();
 
 const app = express();
 //Port server will be running 
 const  serverport = 5000;
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 //Setting up session management
 app.use(session({
@@ -17,7 +22,8 @@ app.use(session({
     resave: false,
     saveUninitialized: true,
     cookie: {
-        maxAge: 100* 60 * 60 //1 hour
+        maxAge: 100* 60 * 60, //1 hour
+        secure: false
     }
 }));
 
@@ -52,7 +58,11 @@ const requireOrganizer = (req,res,next) => {
             error: req.session.user.role + ' is not authorized to perform this action'
         })
     }
+    next();
 }
+
+// Multer setup: store file in memory (not disk)
+const upload = multer({ storage: multer.memoryStorage() });
 
 //Post request to register a new user
 app.post('/api/register', async (req,res) => {
@@ -122,7 +132,7 @@ app.post('/api/login', async (req,res) => {
             if(isPasswordValid){
                 //If password is valid, create a session for the user
                 req.session.user = {
-                    id: user.id,
+                    id: user.user_id,
                     firstName: user.first_name,
                     lastName: user.last_name,
                     email: user.email,
@@ -130,7 +140,7 @@ app.post('/api/login', async (req,res) => {
                 }
                 console.log('User logged in:', user);
                 //Sending a success response with user details
-                res.status(200).json({
+                return res.status(200).json({
                     message: 'Login successful',
                     // User details excluding password
                     user: {
@@ -200,6 +210,8 @@ app.post('/api/events', requireLogin, requireOrganizer, async (req,res) => {
     }
     
     try{
+        //console.log("Session data in /api/events:", req.session);
+        //console.log("User in session:", req.session.user);
         const event = await db.query('INSERT INTO events (organizer_id, event_name, event_date, location) VALUES ($1, $2, $3, $4) RETURNING *', [organizer_id, eventName, eventDate, eventLocation]);
         console.log('New event created:', event.rows[0]);
         return res.status(201).json({
@@ -212,6 +224,66 @@ app.post('/api/events', requireLogin, requireOrganizer, async (req,res) => {
             error: 'Failed to create event'
         })
     }
+})
+
+//Route to handle CSV file uploads by organizers
+app.post('/api/upload-csv/:eventId', requireLogin, requireOrganizer, upload.single('file'), async (req,res) => {
+    const eventId = req.params.eventId;
+    const uploader_id = req.session.user.id;
+    if(!req.file){
+        //If no file is uploaded, return an error
+        return res.status(400).json({
+            error: 'CSV file is required'
+        })
+    }
+    //Check if the event exists and belongs to the current organizer
+    const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, uploader_id]);
+    if(eventCheck.rows.length === 0){
+        //If the event does not exist or does not belong to the organizer, return an error
+        return res.status(403).json({
+            error: 'Event not found or you are not authorized to upload CSV for this event'
+        })
+    }
+    const results = [];//Array to store valid rows
+    const failedRows = [];//Array to store rows with missing fields
+    const bufferStream = new PassThrough();
+    bufferStream.end(req.file.buffer);
+    
+    bufferStream.pipe(csv())
+        .on('data', (row) => {
+            const {first_name, last_name, email_address, category} = row;
+            //Validating the fields
+            if(first_name && last_name && email_address && category){
+                //If all fields are present, push the row to results array
+                results.push([uploader_id, eventId, first_name, last_name, email_address, category])
+            }else{
+                //If any field is missing, push the row to failedRows array
+                failedRows.push(row);
+            }
+        })
+        .on('end', async () => {
+            try{
+                for(const row of results){
+                    await db.query('INSERT INTO csv_uploads (uploader_id, event_id, first_name, last_name, email_address, category) VALUES ($1, $2, $3, $4, $5, $6)', row);
+                }
+                res.status(200).json({
+                    message: 'CSV file uploaded successfully',
+                    totalInserted: results.length,
+                    failedRows: failedRows.length > 0 ? failedRows : undefined
+                });
+            }catch(err){
+                console.error('Error inserting CSV rows: ', err);
+                res.status(500).json({
+                    error: 'Failed to insert CSV data'
+                })
+            }
+        })
+        .on('error', (err) => {
+            console.error('Error parsing CSV file:', err);
+            res.status(500).json({
+                error: 'Failed to parse CSV file'
+            })
+        })
 })
 
 app.listen(serverport, () => {
