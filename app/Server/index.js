@@ -1,11 +1,11 @@
 import express from "express";
 import pg from "pg"
 import nodemailer from "nodemailer";
-import bcrypt from "bcryptjs";
 import session from "express-session";
 import env from "dotenv";
 import csv from "csv-parser";
 import multer from "multer";
+import bcrypt from "bcrypt";
 import cors from "cors";
 import {PassThrough} from "stream";
 env.config();
@@ -26,6 +26,11 @@ app.use(session({
         secure: false
     }
 }));
+
+app.use(cors ({
+    origin: 'http://localhost:3000',
+    credentials: true
+}))
 
 //Creating a database connection to the PostgreSQL database
 const db = new pg.Client({
