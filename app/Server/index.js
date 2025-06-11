@@ -5,7 +5,7 @@ import session from "express-session";
 import env from "dotenv";
 import csv from "csv-parser";
 import multer from "multer";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import cors from "cors";
 import {PassThrough} from "stream";
 env.config();
@@ -43,6 +43,9 @@ const db = new pg.Client({
 db.connect();
 
 //Creating a middleware for protected routes
+
+//Configuring nodemailer for sending email invitations
+
 
 //Middleware to check if user is logged in
 const requireLogin = (req, res, next) => {
@@ -289,6 +292,106 @@ app.post('/api/upload-csv/:eventId', requireLogin, requireOrganizer, upload.sing
                 error: 'Failed to parse CSV file'
             })
         })
+})
+
+//Route to send email invitations to users uploaded via CSV file
+app.post('/api/send_invites/:eventId', requireLogin, requireOrganizer, async (req,res) => {
+    const eventId = req.params.eventId;
+    const organizerId = req.session.user.id;
+    try{
+        const organizerResult = await db.query('SELECT * from users WHERE user_id = $1', [organizerId]);
+        if(organizerResult.rows.length === 0){
+            return res.status(404).json({
+                error: 'Organizer not found'
+            })
+        }
+        //Obtaining the full name of the event organizer from the database
+        const organizer = organizerResult.rows[0];
+        const organizerName = `${organizer.first_name} ${organizer.last_name}`;
+
+        //Check if the event exists and belongs to the current organizer
+        const eventCheck = await db.query('SELECT * from events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        if(eventCheck.rows.length === 0){
+            //If the event does not exist or does not belong to the organizer, return an error
+            return res.status(403).json({
+                error: 'Unauthorized to send invites for this event'
+            })
+        }
+        //Obtaining the event name from the database
+        const eventName = eventCheck.rows[0].event_name;
+
+        //Get the guest list for the event from csv_uploads table
+        const guestListResult = await db.query('SELECT * from csv_uploads WHERE event_id = $1 AND uploader_id = $2', [eventId, organizerId]);
+        if(guestListResult.rows.length === 0){
+            return res.status(404).json({
+                error: 'No guests found for this event'
+            })
+        }
+
+        //Setting up nodemailer transporter for the application
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER, //Planna email address used by event organizers to send invites
+                pass: process.env.EMAIL_PASSWORD
+            }
+        })
+        for(const guest of guestListResult.rows){
+            //Sending email invitations to each guest in the guest list
+        const {first_name, last_name, email_address, category} = guest;
+        //Creating RSVP link for each guest
+        const rsvplink = `http://localhost:3000/rsvp?email=${encodeURIComponent(email_address)}&eventId=${eventId}`;
+        const mailOptions = {
+            from: `"${organizerName} via Planna" <${process.env.EMAIL_USER}>`,
+            to: email_address,
+            subject: `Invitation to ${eventName}`,
+            html:`
+            <p>Dear ${first_name} ${last_name},</p>
+            <p>You have been invited to <strong>${eventName}</strong>.</p>   
+            <p>You're assigned category is: ${category}.</p>
+            <p>Please RSVP using the link below: </p>
+            <p><a href="${rsvplink}">Click here to RSVP</a></p>
+            <p>Thanks, <br>${organizerName}</br></p>         
+            <p><em>This email was sent via Planna</em></p>
+            `,
+            };
+            //Sending the email
+            await transporter.sendMail(mailOptions);
+        }
+        res.status(200).json({
+            message: `Invitations sent successfully to ${guestListResult.rows.length} guests for event: ${eventName}`
+        })
+
+    }catch(err){
+        console.error('Error sending invitations:', err);
+        res.status(500).json({
+            error: 'Failed to send invitations'
+        })
+    }
+})
+
+//Route to get the list of events created by the organizer
+app.get('/api/events', requireLogin, requireOrganizer, async (req,res) => {
+    const organizerId = req.session.user.id;
+    try{
+        //Querying the database to get the list of events created by the organizer
+        const events = await db.query('SELECT * FROM events WHERE organizer_id = $1', [organizerId]);
+        if(events.rows.length === 0){
+            return res.status(404).json({
+                message: 'No events found for this organizer'
+            })
+        }
+        //Sending the list of events as a response
+        res.status(200).json({
+            message: 'Events retrieved successfully',
+            events: events.rows
+        })
+    }catch(err){
+        console.error('Error retrieving events:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve events'
+        })
+    }
 })
 
 app.listen(serverport, () => {
