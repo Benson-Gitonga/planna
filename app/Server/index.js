@@ -472,7 +472,8 @@ app.post('/api/rsvp', async (req,res) => {
         const qrCodeURL = await QRCode.toDataURL(uniqueCode);
         
         //Set QR Code expiration (24 hours after the event)
-        const expires = new Date(`${event_date}T${end_time}`);
+        
+        const expires = new Date(event_date);
         const qrExpiresAt = new Date(expires.getTime() + 24 * 60 * 60 * 1000); // 24 hours after the event end time
 
         //Insert RSVP details
