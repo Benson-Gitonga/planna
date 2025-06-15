@@ -8,6 +8,8 @@ import multer from "multer";
 import bcrypt from "bcryptjs";
 import cors from "cors";
 import {PassThrough} from "stream";
+import {v4 as uuidv4} from 'uuid';
+import QRCode from 'qrcode';
 env.config();
 
 const app = express();
@@ -43,9 +45,6 @@ const db = new pg.Client({
 db.connect();
 
 //Creating a middleware for protected routes
-
-//Configuring nodemailer for sending email invitations
-
 
 //Middleware to check if user is logged in
 const requireLogin = (req, res, next) => {
@@ -361,7 +360,6 @@ app.post('/api/send_invites/:eventId', requireLogin, requireOrganizer, async (re
         res.status(200).json({
             message: `Invitations sent successfully to ${guestListResult.rows.length} guests for event: ${eventName}`
         })
-
     }catch(err){
         console.error('Error sending invitations:', err);
         res.status(500).json({
@@ -390,6 +388,127 @@ app.get('/api/events', requireLogin, requireOrganizer, async (req,res) => {
         console.error('Error retrieving events:', err);
         res.status(500).json({
             error: 'Failed to retrieve events'
+        })
+    }
+})
+
+//Route to allow the event organizers to delete an event
+app.delete('/api/events/:eventId', requireLogin, requireOrganizer, async (req,res) => {
+    const eventId = req.params.eventId;
+    const organizerId = req.session.user.id;
+    try{
+        //Check if the event exists and belongs to the current organizer
+        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        if(eventCheck.rows.length === 0){
+            //If the event does not exists or does not belong to the organizer, return an error
+            return res.status(403).json({
+                error: 'Unauthorized to delete this event or event not found'
+            })        
+        }
+        //Delete the event from the database
+        await db.query('DELETE FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        res.status(200).json({
+            message: `Event ${eventName} deleted successfully!`
+        })
+    }catch(err){
+        console.error('Error deleting event:', err);
+        res.status(500).json({
+            error: 'Internal server error'
+        })
+    }
+})
+
+//Route to get all the events that have been created in the application
+app.get('/api/all-events', async (req,res) => {
+    try{
+        //Querying the database to get all the events
+        const allEvents = await db.query('SELECT * FROM events');
+        if(allEvents.rows.length === 0){
+            return res.status(404).json({
+                message: 'No events found'
+            })
+        }
+        //Send all the events as a response
+        res.status.json({
+            message: 'All events retrieved successfully',
+            events: allEvents.rows
+        })
+    }catch(err){
+        console.error('Error retrieving all events:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve all events'
+        })
+    }
+})
+
+//Route to allow guests to RSVP for an event
+app.post('/api/rsvp', async (req,res) => {
+    const {eventId, firstName, lastName, email, category, rsvp_status} = req.body;
+    if(!req.body || !eventId|| !firstName || !lastName || !email || !category || !rsvp_status){
+        //If any field is missing, return an error
+        return res.status(400).json({
+            error: 'Missing required fields'
+        }) 
+    }
+    try{
+        //Check if the user has already RSVP'd for the event
+        const existingRSVP = await db.query('SELECT * FROM guests WHERE email_address = $1 AND event_id = $2', [email, eventId]);
+        if(existingRSVP.rows.length > 0){
+            return res.status(409).json({
+                error: 'Guest has already RSVP\'d for this event'
+            })
+        }
+        //Get event date and time
+        const eventResult = await db.query('SELECT event_name, event_date, end_time FROM events WHERE event_id = $1', [eventId]);
+        if(eventResult.rows.length === 0){
+            return res.status(404).json({
+                error: 'Event not found'
+            })
+        } 
+        const {event_name, event_date, end_time} = eventResult.rows[0];
+        
+        //Generate the UUID and QR code
+        const uniqueCode = uuidv4();
+        const qrCodeURL = await QRCode.toDataURL(uniqueCode);
+        
+        //Set QR Code expiration (24 hours after the event)
+        const expires = new Date(`${event_date}T${end_time}`);
+        const qrExpiresAt = new Date(expires.getTime() + 24 * 60 * 60 * 1000); // 24 hours after the event end time
+
+        //Insert RSVP details
+        await db.query('INSERT INTO guests (event_id, first_name, last_name, email_address, category, rsvp_status, access_code, qr_code, qr_expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            [eventId, firstName, lastName, email, category, rsvp_status, uniqueCode, qrCodeURL, qrExpiresAt]
+        );
+        //Send confirmation email to the guest
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER, //Planna email address used by event organizers to send invites
+                pass: process.env.EMAIL_PASSWORD
+            },
+        });
+        const mailOptions = {
+            from: `"Planna" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: `RSVP Confrimation for ${event_name}`,
+            html: `
+            <p>Dear ${firstName} ${lastName}</p>  
+            <p>Thank you for RSVPing to <strong>${event_name}</strong></p>  
+            <p>Your access code is: <strong>${uniqueCode}</strong></p> 
+            <p>This code will allow you to view your RSVP and event updates through the website</p>    
+            <p><strong></strong></p>  
+            <p>See you there</p>
+            <p>Thanks, <br>Planna Team</br></p>           
+            `,
+        };
+        await transporter.sendMail(mailOptions);
+        return res.status(201).json({
+            message: 'RSVP recorded successfully and confirmation email sent'
+        });
+    }catch(err){
+        console.error('Error handling RSVP:', err);
+        return res.status(500).json({
+            error: 'Internal server error'
         })
     }
 })
