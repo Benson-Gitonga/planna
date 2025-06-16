@@ -197,9 +197,9 @@ app.get('/api/logout', (req,res) => {
 
 //Route to create a new event
 app.post('/api/events', requireLogin, requireOrganizer, async (req,res) => {
-    const {eventName, eventDate, eventLocation} = req.body;
+    const {eventName, eventDate, eventLocation, startTime, endTime} = req.body;
     const organizer_id = req.session.user.id;
-    if(!req.body || !eventName || !eventDate || !eventLocation){
+    if(!req.body || !eventName || !eventDate || !eventLocation || !startTime || !endTime){
         //If any field is missing, return an error
         return res.status(400).json({
             error: 'All fields are required'
@@ -219,7 +219,7 @@ app.post('/api/events', requireLogin, requireOrganizer, async (req,res) => {
     try{
         //console.log("Session data in /api/events:", req.session);
         //console.log("User in session:", req.session.user);
-        const event = await db.query('INSERT INTO events (organizer_id, event_name, event_date, location) VALUES ($1, $2, $3, $4) RETURNING *', [organizer_id, eventName, eventDate, eventLocation]);
+        const event = await db.query('INSERT INTO events (organizer_id, event_name, event_date, location, start_time, end_time) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [organizer_id, eventName, eventDate, eventLocation, startTime, endTime]);
         console.log('New event created:', event.rows[0]);
         return res.status(201).json({
             message: 'Event created successfully',
