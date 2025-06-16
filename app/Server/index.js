@@ -443,8 +443,8 @@ app.get('/api/all-events', async (req,res) => {
 
 //Route to allow guests to RSVP for an event
 app.post('/api/rsvp', async (req,res) => {
-    const {eventId, firstName, lastName, email, category, rsvp_status} = req.body;
-    if(!req.body || !eventId|| !firstName || !lastName || !email || !category || !rsvp_status){
+    const {eventId, email, rsvp_status} = req.body;
+    if(!req.body || !eventId || !email || !rsvp_status){
         //If any field is missing, return an error
         return res.status(400).json({
             error: 'Missing required fields'
@@ -458,6 +458,15 @@ app.post('/api/rsvp', async (req,res) => {
                 error: 'Guest has already RSVP\'d for this event'
             })
         }
+        //Check if the guest is in the invited guest list
+        const guestResult = await db.query('SELECT first_name, last_name, category FROM csv_uploads WHERE event_id = $1 AND email_address = $2', [eventId, email]);
+        if(guestResult.rows.length === 0){
+            return res.status(404).json({
+                error: 'Guest not found in the invited guest list'
+            })
+        }
+        const {first_name: firstName, last_name: lastName, category} = guestResult.rows[0];
+
         //Get event date and time
         const eventResult = await db.query('SELECT event_name, event_date, end_time FROM events WHERE event_id = $1', [eventId]);
         if(eventResult.rows.length === 0){
