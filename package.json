@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bootstrap-icons": "^1.13.1",
     "bootswatch": "^5.3.6",
     "csv-parser": "^3.2.0",
     "express-session": "^1.18.1",

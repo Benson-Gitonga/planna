@@ -1,11 +1,11 @@
 'use client'
 import React from 'react'
-import Login from '../components/Login'
+import RSVP from '../components/RSVP';
 
 function page() {
   return (
 
-           <Login />
+           <RSVP/>
   )
 }
 

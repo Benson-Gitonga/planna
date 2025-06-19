@@ -3,7 +3,7 @@
 --Removing user_id from the guests table
 Alter TABLE guests
     DROP COLUMN user_id;
-
+ 
 --Adding a UUID column which will be used by the guests for frontend access
 ALTER TABLE guests
     ADD COLUMN access_code VARCHAR(255) UNIQUE NOT NULL;

@@ -91,20 +91,7 @@ export default function Login() {
                 />
               </Form.Group>
 
-              <Form.Group className="mb-4">
-                <Form.Label>Role</Form.Label>
-                <Form.Select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                >
-                  {roles.map((roleOption) => (
-                    <option key={roleOption} value={roleOption}>
-                      {roleOption}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-
+             
               <Button 
                 variant="primary" 
                 type="submit" 

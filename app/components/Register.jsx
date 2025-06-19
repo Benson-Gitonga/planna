@@ -138,11 +138,7 @@ export default function Register() {
                   value={formData.role}
                   onChange={handleChange}
                 >
-                  {roles.map((roleOption) => (
-                    <option key={roleOption} value={roleOption}>
-                      {roleOption}
-                    </option>
-                  ))}
+                  <option value="organizer">organizer</option>
                 </Form.Select>
               </Form.Group>
 
