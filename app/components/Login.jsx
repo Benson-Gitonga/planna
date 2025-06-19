@@ -7,12 +7,9 @@ import { useRouter } from 'next/navigation';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('Guest');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
-
-  const roles = ['Guest', 'Admin', 'Organizer'];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,7 +19,7 @@ export default function Login() {
     try {
       const response = await fetch('http://localhost:5000/api/login', {
         method: 'POST',
-        credentials: 'include', // Required for sessions
+        credentials: 'include', // Required for session cookies
         headers: {
           'Content-Type': 'application/json',
         },
@@ -35,13 +32,8 @@ export default function Login() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Verify role matches
-      if (data.user.role.toLowerCase() !== role.toLowerCase()) {
-        throw new Error(`You are not registered as a ${role}`);
-      }
-
-      // Redirect based on role
-      switch(role.toLowerCase()) {
+      // Redirect user based on role from backend
+      switch (data.user.role.toLowerCase()) {
         case 'admin':
           router.push('/admin');
           break;
@@ -51,7 +43,6 @@ export default function Login() {
         default:
           router.push('/guest');
       }
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -65,9 +56,9 @@ export default function Login() {
         <Col md={8} lg={6} xl={5}>
           <div className="border p-4 rounded bg-white shadow">
             <h2 className="text-center mb-4">Login</h2>
-            
+
             {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
-            
+
             <Form onSubmit={handleSubmit}>
               <Form.Group className="mb-3">
                 <Form.Label>Email address</Form.Label>
@@ -91,7 +82,6 @@ export default function Login() {
                 />
               </Form.Group>
 
-             
               <Button 
                 variant="primary" 
                 type="submit" 
