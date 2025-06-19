@@ -44,8 +44,6 @@ const db = new pg.Client({
 });
 db.connect();
 
-//Creating a middleware for protected routes
-
 //Middleware to check if user is logged in
 const requireLogin = (req, res, next) => {
     if(!req.session.user){
@@ -57,7 +55,7 @@ const requireLogin = (req, res, next) => {
     next();
 }
 
-//Middlware to verify the role of a user
+//Middleware to verify the role of a user
 const requireOrganizer = (req,res,next) => {
     if(req.session.user.role != 'organizer'){
         //If the user is not an organizer, return an error
@@ -67,6 +65,17 @@ const requireOrganizer = (req,res,next) => {
     }
     next();
 }
+//Middleware to ensure that a user is an admin
+const requireAdmin = (req,res,next) => {
+    if(!req.session.user || req.session.user.role !== 'admin'){
+        //If the user is not an admin, return an error
+        return res.status(403).json({
+            error: 'Access denied, admin privileges required'
+        })
+    }
+    next();
+};
+
 
 // Multer setup: store file in memory (not disk)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -522,6 +531,122 @@ app.post('/api/rsvp', async (req,res) => {
         })
     }
 })
+
+//Administrator routes
+
+//Route to get the total event count in the application
+app.get('/api/admin/total-events', requireLogin, requireAdmin, async (req,res) => {
+    try{
+        const eventCountResult = await db.query('SELECT COUNT(*) from events');
+        res.status(200).json({
+            total_events: parseInt(eventCountResult[0].count)
+        })
+    }catch(err){
+        console.error('Error retrieving total events:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve total events'
+        })
+    }
+});
+
+//Route to count total number of organizers in the application
+app.get('/api/admin/total-organizers', requireLogin, requireAdmin, async (req,res) => {
+    try{
+        const organizerCountResult = await db.query('SELECT COUNT(*) FROM users WHERE role = $1', ['organizer']);
+        res.status(200).json({
+            total_organizers: parseInt(organizerCountResult.rows[0].count)
+        })
+    }catch(err){
+        console.error('Error counting organizers', err);
+        res.status(500).json({
+            error: 'Failed to count organizers'
+        })
+    }
+});
+
+//Route to count total number of accepted RSVPs
+app.get('/api/admin/total-rsvps', requireLogin, requireAdmin, async (req,res) => {
+    try{
+        const rsvpCountResult = await db.query('SELECT COUNT(*) FROM guests WHERE rsvp_status = $1', ['accepted']);
+        res.status(200).json({
+            total_rsvp_accepted: parseInt(rsvpCountResult.rows[0].count)
+        });
+    }catch(err){
+        console.error('Error counting RSVPs:', err);
+        res.status(500).json({
+            error: 'Failed to count RSVPs'
+        })
+    }
+});
+
+//Route to view RSVPs per event
+app.get('/api/admin/rsvps-per-event', requireLogin, requireAdmin, async (req,res) => {
+    try{
+        const rsvpsPerEventResult = await db.query(`
+            SELECT e.event_name, COUNT(g.guest_id) AS total_rsvps, 
+            COUNT(CASE WHEN g.rsvp_status = 'accepted' THEN 1 END) AS accepted_rsvps, 
+            COUNT(CASE WHEN g.rsvp_status = 'declined' THEN 1 END) AS declined_rsvps
+            FROM events e
+            LEFT JOIN guests g ON e.event_id = g.event_id
+            GROUP BY e.event_name            
+            `);
+        if(rsvpsPerEventResult.rows.length === 0){
+            return res.status(404).json({
+                message: 'No RSVPs found for any event'
+            })
+        }
+        res.status(200).json({
+            rsvps_per_event: rsvpsPerEventResult.rows            
+        })
+    }catch(err){
+        console.error('Error retrieving RSVPs per event:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve RSVPs per event'
+        })
+    }
+});
+
+//Route to display the most active organizers in the application
+app.get('/api/admin/most-active-organizers', requireLogin, requireAdmin, async (req,res) => {
+    try{
+        const result = await db.query(`
+            SELECT u.user_id, u.first_name, u.last_name, u.email_address, COUNT(e.event_id) AS total_events
+            FROM users u JOIN events e ON u.user_id = e.organizer_id
+            WHERE u.role = 'organizer'
+            GROUP BY u.user_id
+            ORDER BY total_events DESC
+            LIMIT 10            
+            `)
+            res.status(200).json({
+                most_active_organizers: result.rows
+            })
+    } catch (err){
+        console.error('Error retrieving most active organizers', err);
+        res.status(500).json({
+            error: 'Failed to retrieve most active organizers'
+        })
+    }
+})
+
+//Route to display upcoming events
+app.get('/api/admin/upcoming-events', requireLogin, requireAdmin, async (req,res) => {
+    try{
+        const result = await db.query(`
+            SELECT event_id, event_name, event_date, start_time,end_time, location FROM events
+            WHERE event_date >= CURRENT_DATE
+            ORDER BY event_date ASC            
+            `);
+            res.status(200).json({
+                upcoming_events: result.rows
+            })
+    }catch(err){
+        console.error('Error retrieving upcoming events:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve upcoming events'
+        })
+    }
+});
+
 
 app.listen(serverport, () => {
     console.log(`Server is running on port http://localhost:${serverport}`);
