@@ -1,10 +1,10 @@
 'use client'
 import React from 'react'
-import CSVupload from '../components/CSVupload'
+import MyEvents from '../../components/MyEvents'
 function page() {
   return (
 
-           < CSVupload />
+           <MyEvents />
   )
 }
 

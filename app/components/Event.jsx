@@ -8,6 +8,8 @@ export default function CreateEvent() {
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventLocation, setEventLocation] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
@@ -20,7 +22,7 @@ export default function CreateEvent() {
     setLoading(true);
 
     // Validate input
-    if (!eventName || !eventDate || !eventLocation) {
+    if (!eventName || !eventDate || !eventLocation || !startTime || !endTime) {
       setError('All fields are required');
       setLoading(false);
       return;
@@ -43,7 +45,7 @@ export default function CreateEvent() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ eventName, eventDate, eventLocation }),
+        body: JSON.stringify({ eventName, eventDate, eventLocation, startTime, endTime }),
       });
 
       const data = await response.json();
@@ -56,6 +58,8 @@ export default function CreateEvent() {
       setEventName('');
       setEventDate('');
       setEventLocation('');
+      setStartTime('');
+      setEndTime('');
       // Optional: redirect or wait a bit before routing
       setTimeout(() => router.push('/events'), 1500);
 
@@ -98,7 +102,7 @@ export default function CreateEvent() {
                 />
               </Form.Group>
 
-              <Form.Group className="mb-4">
+ <Form.Group className="mb-4">
                 <Form.Label>Event Location</Form.Label>
                 <Form.Control
                   type="text"
@@ -109,6 +113,27 @@ export default function CreateEvent() {
                 />
               </Form.Group>
 
+              <Form.Group className="mb-3">
+                <Form.Label>Start Time</Form.Label>
+                <Form.Control
+                  type="time"
+                  required
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>End Time</Form.Label>
+                <Form.Control
+                  type="time"
+                  required
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </Form.Group>
+
+             
               <Button variant="primary" type="submit" disabled={loading} className="w-100">
                 {loading ? (
                   <>
@@ -128,6 +153,6 @@ export default function CreateEvent() {
           </div>
         </Col>
       </Row>
-    </Container>
+          </Container>
   );
 }

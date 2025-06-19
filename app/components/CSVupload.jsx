@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Form, Button, Alert, Container, Row, Col, Spinner } from 'react-bootstrap';
-import { useRouter } from 'next/navigation';
 
 export default function UploadCsvForm() {
   const [file, setFile] = useState(null);
@@ -10,8 +10,14 @@ export default function UploadCsvForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
 
-  const router = useRouter();
+  useEffect(() => {
+    const idFromURL = searchParams.get('eventId');
+    if (idFromURL) {
+      setEventId(idFromURL);
+    }
+  }, [searchParams]);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -24,7 +30,7 @@ export default function UploadCsvForm() {
     setLoading(true);
 
     if (!file || !eventId) {
-      setError('Both event ID and CSV file are required.');
+      setError('Event ID is missing or CSV file not selected.');
       setLoading(false);
       return;
     }
@@ -50,11 +56,6 @@ export default function UploadCsvForm() {
         setSuccess(prev => prev + ` Some rows failed (${data.failedRows.length}).`);
       }
       setFile(null);
-      setEventId('');
-
-      // Optionally redirect or refresh
-      // router.push('/organizer');
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -73,16 +74,8 @@ export default function UploadCsvForm() {
             {success && <Alert variant="success">{success}</Alert>}
 
             <Form onSubmit={handleSubmit}>
-              <Form.Group className="mb-3">
-                <Form.Label>Event ID</Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Enter Event ID"
-                  value={eventId}
-                  onChange={(e) => setEventId(e.target.value)}
-                  required
-                />
-              </Form.Group>
+              {/* Hidden input just to keep eventId in form context if needed */}
+              <input type="hidden" value={eventId} readOnly />
 
               <Form.Group className="mb-4">
                 <Form.Label>CSV File</Form.Label>
