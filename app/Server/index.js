@@ -429,7 +429,7 @@ app.get('/api/all-events', async (req,res) => {
             })
         }
         //Send all the events as a response
-        res.status.json({
+        res.status(200).json({
             message: 'All events retrieved successfully',
             events: allEvents.rows
         })
