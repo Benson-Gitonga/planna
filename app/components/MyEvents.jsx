@@ -49,7 +49,7 @@ export default function MyEvents() {
                   <strong>Time:</strong> {event.start_time} - {event.end_time}
                 </Card.Text>
                 <div className="d-flex gap-2">
-                  <Link href={`/csvupload?eventId=${event.event_id}`}>
+                  <Link href={`/organizer/csvupload?eventId=${event.event_id}`}>
                     <Button variant="primary" size="sm">Upload CSV</Button>
                   </Link>
                   <Link href={`/send-invites?eventId=${event.event_id}`}>
