@@ -67,7 +67,7 @@ const requireOrganizer = (req,res,next) => {
 }
 //Middleware to ensure that a user is an admin
 const requireAdmin = (req,res,next) => {
-    if(!req.session.user || req.session.user.role !== 'admin'){
+    if(req.session.user.role !== 'admin'){
         //If the user is not an admin, return an error
         return res.status(403).json({
             error: 'Access denied, admin privileges required'
@@ -160,7 +160,7 @@ app.post('/api/login', async (req,res) => {
                     message: 'Login successful',
                     // User details excluding password
                     user: {
-                        id: user.id,
+                        id: user.user_id,
                         firstName: user.first_name,
                         lastName: user.last_name,
                         email: user.email,
@@ -185,6 +185,18 @@ app.post('/api/login', async (req,res) => {
             error: 'Failed to login user'
         })
     }
+})
+//Route to verify the session of a user
+app.get('/api/me', (req,res) => {
+    if(!req.session.user){
+        //If user is not logged in, return an error
+        return res.status(401).json({
+            error: 'Unauthorized access, please login first'
+        })
+    }
+    res.status(200).json({
+        user: req.session.user
+    })
 })
 
 //Adding a route to logout the user
@@ -539,7 +551,7 @@ app.get('/api/admin/total-events', requireLogin, requireAdmin, async (req,res) =
     try{
         const eventCountResult = await db.query('SELECT COUNT(*) from events');
         res.status(200).json({
-            total_events: parseInt(eventCountResult[0].count)
+            total_events: parseInt(eventCountResult.rows[0].count)
         })
     }catch(err){
         console.error('Error retrieving total events:', err);
@@ -610,7 +622,7 @@ app.get('/api/admin/rsvps-per-event', requireLogin, requireAdmin, async (req,res
 app.get('/api/admin/most-active-organizers', requireLogin, requireAdmin, async (req,res) => {
     try{
         const result = await db.query(`
-            SELECT u.user_id, u.first_name, u.last_name, u.email_address, COUNT(e.event_id) AS total_events
+            SELECT u.user_id, u.first_name, u.last_name, u.email, COUNT(e.event_id) AS total_events
             FROM users u JOIN events e ON u.user_id = e.organizer_id
             WHERE u.role = 'organizer'
             GROUP BY u.user_id
