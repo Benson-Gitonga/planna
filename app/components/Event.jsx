@@ -1,8 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { Form, Button, Container, Row, Col, Alert, Spinner } from 'react-bootstrap';
+import {
+  Form,
+  Button,
+  Container,
+  Row,
+  Col,
+  Alert,
+  Spinner,
+  Card,
+} from 'react-bootstrap';
 import { useRouter } from 'next/navigation';
+import {
+  FaCalendarAlt,
+  FaClock,
+  FaMapMarkerAlt,
+  FaRegFlag,
+} from 'react-icons/fa';
 
 export default function CreateEvent() {
   const [eventName, setEventName] = useState('');
@@ -21,9 +36,8 @@ export default function CreateEvent() {
     setSuccess('');
     setLoading(true);
 
-    // Validate input
     if (!eventName || !eventDate || !eventLocation || !startTime || !endTime) {
-      setError('All fields are required');
+      setError('All fields are required.');
       setLoading(false);
       return;
     }
@@ -33,7 +47,7 @@ export default function CreateEvent() {
     const inputDate = new Date(eventDate);
 
     if (inputDate < today) {
-      setError('Event date cannot be in the past');
+      setError('Event date cannot be in the past.');
       setLoading(false);
       return;
     }
@@ -41,7 +55,7 @@ export default function CreateEvent() {
     try {
       const response = await fetch('http://localhost:5000/api/events', {
         method: 'POST',
-        credentials: 'include', // for session handling
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -49,18 +63,14 @@ export default function CreateEvent() {
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create event');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create event');
-      }
-
-      setSuccess('Event created successfully!');
+      setSuccess('🎉 Event created successfully!');
       setEventName('');
       setEventDate('');
       setEventLocation('');
       setStartTime('');
       setEndTime('');
-      // Optional: redirect or wait a bit before routing
       setTimeout(() => router.push('/events'), 1500);
 
     } catch (err) {
@@ -71,88 +81,109 @@ export default function CreateEvent() {
   };
 
   return (
-    <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-      <Row className="w-100 justify-content-center">
+    <Container className="py-3">
+      <Row className="justify-content-center">
         <Col md={8} lg={6} xl={5}>
-          <div className="border p-4 rounded bg-white shadow">
-            <h2 className="text-center mb-4">Create Event</h2>
+          <Card className="shadow-lg border-0">
+            <Card.Body className="p-4">
+              <h5 className="text-center mb-4">📅 Create Event</h5>
 
-            {error && <Alert variant="danger">{error}</Alert>}
-            {success && <Alert variant="success">{success}</Alert>}
+              {error && <Alert variant="danger">{error}</Alert>}
+              {success && <Alert variant="success">{success}</Alert>}
 
-            <Form onSubmit={handleSubmit}>
-              <Form.Group className="mb-3">
-                <Form.Label>Event Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  required
-                  value={eventName}
-                  onChange={(e) => setEventName(e.target.value)}
-                  placeholder="Enter event name"
-                />
-              </Form.Group>
+              <Form onSubmit={handleSubmit}>
+                <Form.Group className="mb-3">
+                  <Form.Label>
+                    <FaRegFlag className="me-2 text-primary" />
+                    Event Name
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="e.g., Product Launch"
+                    value={eventName}
+                    onChange={(e) => setEventName(e.target.value)}
+                    required
+                  />
+                </Form.Group>
 
-              <Form.Group className="mb-3">
-                <Form.Label>Event Date</Form.Label>
-                <Form.Control
-                  type="date"
-                  required
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                />
-              </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>
+                    <FaCalendarAlt className="me-2 text-primary" />
+                    Event Date
+                  </Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    required
+                  />
+                </Form.Group>
 
- <Form.Group className="mb-4">
-                <Form.Label>Event Location</Form.Label>
-                <Form.Control
-                  type="text"
-                  required
-                  value={eventLocation}
-                  onChange={(e) => setEventLocation(e.target.value)}
-                  placeholder="Enter location"
-                />
-              </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>
+                    <FaMapMarkerAlt className="me-2 text-primary" />
+                    Location
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="e.g., Nairobi, Kenya"
+                    value={eventLocation}
+                    onChange={(e) => setEventLocation(e.target.value)}
+                    required
+                  />
+                </Form.Group>
 
-              <Form.Group className="mb-3">
-                <Form.Label>Start Time</Form.Label>
-                <Form.Control
-                  type="time"
-                  required
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </Form.Group>
+                <Row>
+                  <Col>
+                    <Form.Group className="mb-3">
+                      <Form.Label>
+                        <FaClock className="me-2 text-primary" />
+                        Start Time
+                      </Form.Label>
+                      <Form.Control
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col>
+                    <Form.Group className="mb-3">
+                      <Form.Label>
+                        <FaClock className="me-2 text-primary" />
+                        End Time
+                      </Form.Label>
+                      <Form.Control
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
 
-              <Form.Group className="mb-3">
-                <Form.Label>End Time</Form.Label>
-                <Form.Control
-                  type="time"
-                  required
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </Form.Group>
-
-             
-              <Button variant="primary" type="submit" disabled={loading} className="w-100">
-                {loading ? (
-                  <>
-                    <Spinner
-                      as="span"
-                      animation="border"
-                      size="sm"
-                      role="status"
-                      aria-hidden="true"
-                      className="me-2"
-                    />
-                    Submitting...
-                  </>
-                ) : 'Create Event'}
-              </Button>
-            </Form>
-          </div>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  className="w-100"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Spinner animation="border" size="sm" className="me-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Event'
+                  )}
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
         </Col>
       </Row>
-          </Container>
+    </Container>
   );
 }

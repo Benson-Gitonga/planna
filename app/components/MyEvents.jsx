@@ -1,10 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, Button, Spinner, Alert, Row, Col } from 'react-bootstrap';
+import { Table, Button, Spinner, Alert, Container, Row, Col } from 'react-bootstrap';
+import ExportCSVButton from './ExportCSVButton';
+import ExportPDFButton from './ExportPdfButton';
 import Link from 'next/link';
+import { FaFileUpload, FaPaperPlane, FaUsers, FaDownload } from 'react-icons/fa';
+import { saveAs } from 'file-saver';
+import Papa from 'papaparse';
 
-export default function MyEvents() {
+export default function EventActionsTable() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -17,9 +22,7 @@ export default function MyEvents() {
           credentials: 'include',
         });
         const data = await res.json();
-
         if (!res.ok) throw new Error(data.error || 'Failed to fetch events');
-
         setEvents(data.events);
       } catch (err) {
         setError(err.message);
@@ -31,36 +34,43 @@ export default function MyEvents() {
     fetchEvents();
   }, []);
 
+   
+
   if (loading) return <Spinner animation="border" className="d-block mx-auto mt-5" />;
   if (error) return <Alert variant="danger" className="mt-3">{error}</Alert>;
 
   return (
-    <div className="container mt-4">
-      <h3 className="mb-4 text-center">Your Events</h3>
-      <Row className="g-4 justify-content-center">
-        {events.map((event) => (
-          <Col key={event.event_id} xs={12} md={6} lg={4}>
-            <Card className="shadow-sm">
-              <Card.Body>
-                <Card.Title>{event.event_name}</Card.Title>
-                <Card.Text>
-                  <strong>Date:</strong> {event.event_date}<br />
-                  <strong>Location:</strong> {event.location}<br />
-                  <strong>Time:</strong> {event.start_time} - {event.end_time}
-                </Card.Text>
-                <div className="d-flex gap-2">
-                  <Link href={`/organizer/csvupload?eventId=${event.event_id}`}>
-                    <Button variant="primary" size="sm">Upload CSV</Button>
-                  </Link>
-                  <Link href={`/send-invites?eventId=${event.event_id}`}>
-                    <Button variant="success" size="sm">Send Invites</Button>
-                  </Link>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-    </div>
+    <>
+    <div className="d-flex justify-content-between align-items-center mb-3">
+  <h3>Your Events</h3>
+  <div className="d-flex gap-2">
+    <ExportCSVButton data={events} filename="events_export.csv" />
+    <ExportPDFButton data={events} filename="events_export.pdf" />
+  </div>
+</div>    
+
+      <Table striped bordered hover responsive>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Event Name</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.map((event, index) => (
+            <tr key={event.event_id}>
+              <td>{index + 1}</td>
+              <td>{event.event_name}</td>
+              <td>{event.event_date}</td>
+              <td>{event.location}</td>
+              <td>{event.start_time} - {event.end_time}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      </>
   );
 }
