@@ -544,6 +544,125 @@ app.post('/api/rsvp', async (req,res) => {
     }
 })
 
+//Route to retrieve the guest list for an event from csv_uploads table
+app.get('/api/guest-list/:eventId', requireLogin, requireOrganizer, async (req,res) => {
+    const eventId = req.params.eventId;
+    const organizerId = req.session.user.id;
+    try{
+        //Check if the event exists and belongs to the current organizer
+        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        if(eventCheck.rows.length === 0){
+            //If the event does not exist or does not belong to the organizer, return an error
+            return res.status(403).json({
+                error: 'Unauthorized to view guest list for this event'
+            })
+        }
+        //Querying the database to get the guest list for the event
+        const guestList = await db.query('SELECT * FROM csv_uploads WHERE event_id = $1 AND uploader_id = $2', [eventId, organizerId]);
+        if(guestList.rows.length === 0){
+            return res.status(404).json({
+                message: 'No guests found for this event'
+            })
+        }
+        //Sending the guest list as a response
+        res.status(200).json({
+            message: 'Guest list retrieved successfully',
+            guests: guestList.rows
+        })
+    }catch(err){
+        console.error('Error retrieving guest list:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve guest list'
+        })
+    }
+})
+
+//Route to allow an organizer to add a guest manually to the csv_uploads table
+app.post('/api/add-guest/:eventId', requireLogin, requireOrganizer, async (req,res) => {
+    const eventId = req.params.eventId;
+    const organizerId = req.session.user.id;
+    const {firstName, lastName, email, category} = req.body;
+
+    if(!firstName || !lastName || !email || !category){
+        //If any field is missing return an error
+        return res.status(400).json({
+            error: 'All fields are required'
+        })
+    }
+    //Validate category
+    if(!['VIP', 'Regular'].includes(category)){
+        return res.status(400).json({
+            error: 'Invalid category. Must be VIP or Regular'
+        })
+    }
+    try{
+        //Ensure the event belongs to this organizer
+        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        if(eventCheck.rows.length === 0){
+            //If the event does not exist or does not belong to the organizer, return an error
+            return res.status(403).json({
+                error: 'Unauthorized to add guest for this event'
+            })
+        }
+        //Check if the guest already exists in the csv_uploads table
+        const existingGuest = await db.query('SELECT * FROM csv_uploads WHERE event_id = $1 AND email_address = $2', [eventId, email]);
+        if(existingGuest.rows.length > 0){
+            return res.status(409).json({
+                error: 'Guest with this email already exists for this event'
+            })
+        }
+        //Insert the new guest into the csv_uploads table
+        const insertResult = await db.query(`INSERT INTO csv_uploads (uploader_id, event_id, first_name, last_name, email_address, category) 
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [organizerId, eventId, firstName, lastName, email, category]);
+
+            res.status(201).json({
+                message: 'Guest added successfully',
+                guest: insertResult.rows[0]
+            });
+    }catch(err){
+        console.error('Error adding guest to csv_uploads:', err);
+        res.status(500).json({
+            error: 'Failed to add guest'
+        })
+    }
+})
+
+//Route to retrieve guest responses for an event by an organizer
+app.get('/api/guest-responses/:eventId', requireLogin, requireOrganizer, async (req,res) => {
+    const eventId = req.params.eventId;
+    const organizerId = req.session.user.id;
+    try{
+        //Check if the event exists and belongs to the current organizer
+        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        if(eventCheck.rows.length === 0){
+            //If the event does not exist or does not belong to the organizer, return an error
+            return res.status(403).json({
+                error: 'Unauthorized to view guest responses for this event'
+            })
+        }
+        //Querying the database to get the guest responses for the event
+        const responses = await db.query('SELECT * FROM guests WHERE event_id = $1', [eventId]);
+        if(responses.rows.length === 0){
+            return res.status(404).json({
+                message: 'No guest responses found for this event'
+            })
+        }
+        //Sending the guest responses as a response
+        res.status(200).json({
+            message: 'Guest responses retrieved successfully',
+            guests: responses.rows
+        })
+    }catch(err){
+        console.error('Error retrieving guest responses:', err);
+        return res.status(500).json({
+            error: 'Failed to retrieve guest responses'
+        })
+    }
+})
+
+//
+
 //Administrator routes
 
 //Route to get the total event count in the application
@@ -658,6 +777,7 @@ app.get('/api/admin/upcoming-events', requireLogin, requireAdmin, async (req,res
         })
     }
 });
+
 
 
 app.listen(serverport, () => {
