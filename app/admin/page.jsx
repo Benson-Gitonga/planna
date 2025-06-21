@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner, Card, Row, Col } from 'react-bootstrap';
-import OrganizerTopbar from '../components/OrganizerTopbar';
 import {
   BiUserPlus,
   BiUserCircle,
@@ -86,33 +85,58 @@ export default function AdminDashboard() {
 
 const features = [
   {
-    icon: <BiUserPlus size={28} className="text-primary" />,
+    icon: <BiUserPlus size={28} className="admin-feature-icon text-primary" />,
     title: 'Create Organizer Accounts',
     description:
       'Add new event organizers to the system, assign roles, and give them access to event planning tools.',
   },
   {
-    icon: <BiUserCircle size={28} className="text-success" />,
+    icon: <BiUserCircle size={28} className="admin-feature-icon text-success" />,
     title: 'Manage User Accounts',
     description:
       'View, edit, or deactivate organizer accounts. Monitor account activity and roles.',
   },
   {
-    icon: <BiCalendarEvent size={28} className="text-warning" />,
+    icon: <BiCalendarEvent size={28} className="admin-feature-icon text-warning" />,
     title: 'Oversee Events',
     description:
       'Browse and manage events across the platform. Monitor statuses, edit event data, or intervene if needed.',
   },
   {
-    icon: <BiBarChartSquare size={28} className="text-danger" />,
+    icon: <BiBarChartSquare size={28} className="admin-feature-icon text-danger" />,
     title: 'View Analytics',
     description:
       'Access insights on platform usage, event performance, guest activity, and engagement trends.',
   },
   {
-    icon: <i className="bi bi-shield-lock text-secondary" style={{ fontSize: '1.75rem' }}></i>,
+    icon: (
+      <i
+        className="admin-feature-icon bi bi-shield-lock text-secondary"
+        style={{ fontSize: '1.75rem' }}
+      ></i>
+    ),
     title: 'System Integrity',
     description:
       'Ensure data accuracy, enforce security rules, and maintain platform reliability for all users.',
   },
 ];
+
+// Add this global style for card (box) hover effect
+if (typeof window !== 'undefined') {
+  const style = document.createElement('style');
+  style.innerHTML = `
+    .admin-feature-card {
+      transition: transform 0.3s cubic-bezier(.4,2,.6,1), box-shadow 0.3s cubic-bezier(.4,2,.6,1), filter 0.2s;
+      will-change: transform, box-shadow, filter;
+    }
+    .admin-feature-card:hover {
+      transform: scale(1.08);
+      box-shadow: 0 1.5rem 2rem rgba(0,0,0,0.10);
+      filter: brightness(1.07);
+    }
+    .admin-feature-icon {
+      transition: none;
+    }
+  `;
+  document.head.appendChild(style);
+}

@@ -49,7 +49,7 @@ export default function OrganizerDashboard() {
           {user ? `Welcome, ${user.firstName} 👋` : 'Welcome, Organizer 👋'}
         </h3>
         <p className="text-muted mb-4">
-          This is your event organizer dashboard. Manage your events, guests, and invitations efficiently.
+           You're all set! Start organizing unforgettable events, inviting guests, and tracking responses effortlessly.
         </p>
 
         <Row className="g-4">

@@ -1,10 +1,10 @@
 'use client'
 import React from 'react'
-import Register from '../../components/Register'
+import AdminRegister from '../../components/AdminRegister'
 function page() {
   return (
 
-           <Register/>
+           <AdminRegister/>
   )
 }
 

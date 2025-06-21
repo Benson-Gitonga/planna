@@ -9,6 +9,7 @@ const navItems = [
   { label: 'Manage Accounts', icon: 'bi-person-gear', link: '/admin/manage-accounts' },
   { label: 'Manage Events', icon: 'bi-calendar-check', link: '/admin/manage-events' },
   { label: 'Statistics', icon: 'bi-bar-chart-line', link: '/admin/statistics' },
+  { label: 'Logout', icon: 'bi-box-arrow-right', link: '/' }
 ];
 
 export default function AdminSidebar() {
