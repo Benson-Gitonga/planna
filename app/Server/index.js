@@ -314,6 +314,85 @@ app.post('/api/upload-csv/:eventId', requireLogin, requireOrganizer, upload.sing
         })
 })
 
+// Route to manually add a guest to the csv_uploads table for a specific event
+app.post('/api/organizer/manual-guest-upload/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+    const organizerId = req.session.user.id;
+    const event_id = req.params.eventId;
+    const { first_name, last_name, email_address, category } = req.body;
+
+    // Validate inputs
+    if (!first_name || !last_name || !email_address || !category) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const validCategories = ['VIP', 'Regular'];
+    if (!validCategories.includes(category)) {
+        return res.status(400).json({ error: 'Invalid category. Must be either VIP or Regular' });
+    }
+
+    try {
+        // Ensure the event belongs to the current organizer
+        const eventCheck = await db.query(
+            'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+            [event_id, organizerId]
+        );
+
+        if (eventCheck.rows.length === 0) {
+            return res.status(403).json({ error: 'You do not have permission to modify this event' });
+        }
+
+        // Insert guest into csv_uploads
+        await db.query(
+            `INSERT INTO csv_uploads (uploader_id, event_id, first_name, last_name, email_address, category)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [organizerId, event_id, first_name.trim(), last_name.trim(), email_address.trim(), category]
+        );
+
+        res.status(201).json({ message: 'Guest manually added to CSV uploads' });
+    } catch (err) {
+        console.error('Error adding guest manually:', err);
+        res.status(500).json({ error: 'Failed to add guest' });
+    }
+});
+
+//Route to delete a guest from the csv_uploads table
+app.delete('/api/organizer/delete-guest/:eventId/:email', requireLogin, requireOrganizer, async (req,res) => {
+    const eventId = req.params.eventId;
+    const email = req.params.email;
+    const organizerId = req.session.user.id;
+    try{
+        //Check if the event exists and belongs to the current organizer
+        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        if(eventCheck.rows.length === 0){
+            //If the event does not exist or does not belong to the organizer, return an error
+            return res.status(403).json({
+                error: 'Unauthorized to delete guest for this event'
+            })
+        }
+        //Check if the guest exists in the csv_uploads table
+        const guestCheck = await db.query('SELECT * FROM csv_uploads WHERE event_id = $1 AND email_address = $2', [eventId, email]);
+        if(guestCheck.rows.length === 0){
+            //If the guest does not exist in the csv_uploads table, return an error
+            return res.status(404).json({
+                error: 'Guest not found in the invited guest list for this event'
+            })
+        }
+        //Delete the guest from the csv_uploads table
+        await db.query('DELETE FROM csv_uploads WHERE event_id = $1 AND email_address = $2', [eventId, email]);
+        res.status(200).json({
+            message: `Guest with email ${email} deleted successfully from the event`
+        })
+    }catch(err){
+        console.error('Error deleting guest from csv_uploads:', err);
+        res.status(500).json({
+            error: 'Failed to delete guest from the event'
+        })
+    }
+})
+
+
+
+
 //Route to send email invitations to users uploaded via CSV file
 app.post('/api/send_invites/:eventId', requireLogin, requireOrganizer, async (req,res) => {
     const eventId = req.params.eventId;
@@ -367,8 +446,7 @@ app.post('/api/send_invites/:eventId', requireLogin, requireOrganizer, async (re
             subject: `Invitation to ${eventName}`,
             html:`
             <p>Dear ${first_name} ${last_name},</p>
-            <p>You have been invited to <strong>${eventName}</strong>.</p>   
-            <p>You're assigned category is: ${category}.</p>
+            <p>You have been invited to <strong>${eventName}</strong>.</p> 
             <p>Please RSVP using the link below: </p>
             <p><a href="${rsvplink}">Click here to RSVP</a></p>
             <p>Thanks, <br>${organizerName}</br></p>         
@@ -543,6 +621,43 @@ app.post('/api/rsvp', async (req,res) => {
         })
     }
 })
+
+// Route: Get RSVP responses for a specific event (organizer-only)
+app.get('/api/organizer/event-rsvps/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+    const organizerId = req.session.user.id;
+    const eventId = req.params.eventId;
+
+    try {
+        // 1. Verify the event belongs to this organizer
+        const eventCheck = await db.query(
+            'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+            [eventId, organizerId]
+        );
+
+        if (eventCheck.rows.length === 0) {
+            return res.status(403).json({ error: 'Unauthorized access to event data' });
+        }
+
+        // 2. Fetch RSVP responses from guests table
+        const guestRSVPs = await db.query(
+            `SELECT guest_id, first_name, last_name, email_address, category, rsvp_status, check_in_status, seat_number
+             FROM guests
+             WHERE event_id = $1`,
+            [eventId]
+        );
+
+        if (guestRSVPs.rows.length === 0) {
+            return res.status(404).json({ message: 'No guests found for this event' });
+        }
+
+        res.status(200).json({ rsvps: guestRSVPs.rows });
+
+    } catch (err) {
+        console.error('Error retrieving RSVPs:', err);
+        res.status(500).json({ error: 'Failed to retrieve RSVP responses' });
+    }
+});
+
 
 //Route to retrieve the guest list for an event from csv_uploads table
 app.get('/api/guest-list/:eventId', requireLogin, requireOrganizer, async (req,res) => {
