@@ -1,19 +1,44 @@
 'use client';
 
 import React from 'react';
-import { Navbar, Container } from 'react-bootstrap';
+import { Navbar, Container, Dropdown } from 'react-bootstrap';
 
-export default function OrganizerTopbar({ user }) {
+export default function OrganizerTopbar({ user, onLogout, sidebarOpen }) {
+  const firstName = user?.firstName || 'Organizer';
+  const leftOffset = sidebarOpen ? 220 : 70;
+
   return (
-    <Navbar bg="light" className="shadow-sm px-3 border-bottom">
-      <Container fluid className="d-flex justify-content-between align-items-center">
-        <div>
-          <h2 className="mb-0 fs-4">Organizer Dashboard</h2>
-        </div>
-        <div>
-          <i className="bi bi-person-circle fs-4"></i>
-          {user && <span className="ms-2">{user.name}</span>}
-        </div>
+    <Navbar
+      bg="white"
+      className="shadow-sm border-bottom"
+      expand="lg"
+      fixed="top"
+      style={{
+        height: '64px',
+        zIndex: 1040,
+        left: `${leftOffset}px`,
+        right: 0,
+        position: 'fixed',
+      }}
+    >
+      <Container fluid className="d-flex justify-content-end">
+        <Dropdown align="end">
+          <Dropdown.Toggle
+            variant="light"
+            id="dropdown-user"
+            className="d-flex align-items-center border-0"
+            style={{ background: 'transparent', boxShadow: 'none' }}
+          >
+            <i className="bi bi-person-circle fs-4 me-2"></i>
+            <span className="fw-medium">Hello, {firstName}</span>
+          </Dropdown.Toggle>
+
+          <Dropdown.Menu>
+            <Dropdown.Item onClick={onLogout}>
+              <i className="bi bi-box-arrow-right me-2"></i> Logout
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown>
       </Container>
     </Navbar>
   );

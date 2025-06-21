@@ -19,7 +19,7 @@ export default function Login() {
     try {
       const response = await fetch('http://localhost:5000/api/login', {
         method: 'POST',
-        credentials: 'include', // Required for session cookies
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -28,11 +28,9 @@ export default function Login() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
+      if (!response.ok) throw new Error(data.error || 'Login failed');
 
-      // Redirect user based on role from backend
+      // Role-based redirection
       switch (data.user.role.toLowerCase()) {
         case 'admin':
           router.push('/admin');
@@ -44,66 +42,71 @@ export default function Login() {
           router.push('/guest');
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Login failed.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-      <Row className="w-100 justify-content-center">
-        <Col md={8} lg={6} xl={5}>
-          <div className="border p-4 rounded bg-white shadow">
-            <h2 className="text-center mb-4">Login</h2>
-
-            {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
-
-            <Form onSubmit={handleSubmit}>
-              <Form.Group className="mb-3">
-                <Form.Label>Email address</Form.Label>
-                <Form.Control
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter email"
-                />
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Password</Form.Label>
-                <Form.Control
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                />
-              </Form.Group>
-
-              <Button 
-                variant="primary" 
-                type="submit" 
-                disabled={loading}
-                className="w-100"
-              >
-                {loading ? (
-                  <>
-                    <Spinner
-                      as="span"
-                      animation="border"
-                      size="sm"
-                      role="status"
-                      aria-hidden="true"
-                      className="me-2"
-                    />
-                    Signing in...
-                  </>
-                ) : 'Sign In'}
-              </Button>
-            </Form>
+    <Container fluid className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh', backgroundColor: '#f8f9fc' }}>
+      <Row className="shadow-lg rounded-4 overflow-hidden bg-white w-100" style={{ maxWidth: '850px' }}>
+        
+        {/* Left side (illustration or welcome) */}
+        <Col md={5} className="d-none d-md-flex align-items-center justify-content-center bg-primary text-white p-4">
+          <div className="text-center">
+            <h2 className="fw-bold">Welcome Back!</h2>
+            <p className="mb-0">Log in to access your events and dashboard.</p>
           </div>
+        </Col>
+
+        {/* Right side (form) */}
+        <Col xs={12} md={7} className="p-4">
+          <h3 className="fw-bold text-center mb-4">Sign In</h3>
+
+          {error && <Alert variant="danger" className="text-center">{error}</Alert>}
+
+          <Form onSubmit={handleSubmit}>
+            <Form.Group className="mb-3">
+              <Form.Label>Email address</Form.Label>
+              <Form.Control
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-4">
+              <Form.Label>Password</Form.Label>
+              <Form.Control
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </Form.Group>
+
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={loading}
+              className="w-100 fw-semibold"
+            >
+              {loading ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Signing in...
+                </>
+              ) : 'Sign In'}
+            </Button>
+
+            <div className="text-center mt-3">
+              <a href="/register" className="text-decoration-none text-primary small">Don't have an account? Register</a>
+            </div>
+          </Form>
         </Col>
       </Row>
     </Container>

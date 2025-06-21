@@ -4,9 +4,11 @@ import React from 'react';
 import Link from 'next/link';
 
 const actions = [
+  { label: 'Dashboard', icon: 'bi-house', link: '/organizer' },
   { label: 'Create Event', icon: 'bi-calendar-plus', link: '/organizer/event' },
   { label: 'View Events', icon: 'bi-list-ul', link: '/organizer/myevents' },
   { label: 'Manage Events', icon: 'bi-person-check', link: '/organizer/manage-events' },
+  { label: 'Logout', icon: 'bi-box-arrow-right', link: '/' },
 ];
 
 const sidebarStyle = (open) => ({

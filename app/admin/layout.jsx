@@ -1,19 +1,40 @@
-'use client'
+'use client';
 
-import React from 'react'
-import AdminNavbar from '../components/Adminnavbar'
-
+import AdminSidebar from '../components/AdminSidebar';
 
 export default function AdminLayout({ children }) {
-return (
-<html lang="en">
-<body className="d-flex flex-column min-vh-100">
-<AdminNavbar />
-<main className="flex-fill container py-4">
-{children}
-</main>
+  const sidebarWidth = 240; // consistent width
 
-</body>
-</html>
-)
+  return (
+    <div className="d-flex" style={{ minHeight: '100vh' }}>
+      {/* Sidebar */}
+      <div
+        style={{
+          width: sidebarWidth,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '100%',
+          backgroundColor: '#1f1f2e',
+          color: '#fff',
+          boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+          zIndex: 1000,
+        }}
+      >
+        <AdminSidebar />
+      </div>
+
+      {/* Main Content */}
+      <div
+        style={{
+          marginLeft: sidebarWidth,
+          padding: '2rem',
+          width: `calc(100% - ${sidebarWidth}px)`,
+          backgroundColor: '#f8f9fa',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }

@@ -1,22 +1,20 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import CardItem from '../components/CardItem';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Spinner } from 'react-bootstrap';
+import { Spinner, Card, Row, Col } from 'react-bootstrap';
+import OrganizerTopbar from '../components/OrganizerTopbar';
+import {
+  BiUserPlus,
+  BiUserCircle,
+  BiBarChartSquare,
+  BiCalendarEvent,
+} from 'react-icons/bi';
 
-const cards = [
-  { icon: 'search', label: 'Search Account', link: '/admin/search-account' },
-  { icon: 'person-plus', label: 'Add Organizer Account', link: '/admin/add-account' },
-  { icon: 'person-gear', label: 'Manage Accounts', link: '/admin/manage-accounts' },
-  { icon: 'calendar-check', label: 'Manage Events', link: '/admin/manage-events' },
-  { icon: 'bar-chart-line', label: 'View Statistics', link: '/admin/statistics' },
-];
-
-export default function Page() {
+export default function AdminDashboard() {
   const router = useRouter();
   const [checkingSession, setCheckingSession] = useState(true);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -25,17 +23,12 @@ export default function Page() {
           credentials: 'include',
         });
 
-        if (res.status === 401) {
-          router.replace('/login'); // Not logged in
-          return;
-        }
-
+        if (res.status === 401) return router.replace('/login');
         const data = await res.json();
-        if (data.user.role !== 'admin') {
-          router.replace('/unauthorized'); // Logged in, but not admin
-        }
+
+        if (data.user.role !== 'admin') return router.replace('/unauthorized');
+        setUser(data.user);
       } catch (err) {
-        console.error('Session check error:', err);
         router.replace('/login');
       } finally {
         setCheckingSession(false);
@@ -47,26 +40,79 @@ export default function Page() {
 
   if (checkingSession) {
     return (
-      <div className="d-flex justify-content-center align-items-center min-vh-100">
-        <Spinner animation="border" />
+      <div className="d-flex flex-column justify-content-center align-items-center min-vh-100 text-center">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-3 text-muted">Verifying your session...</p>
       </div>
     );
   }
 
   return (
-    <div className="d-flex flex-column align-items-center justify-content-center min-vh-100">
-      <h2 className="mb-4 fw-bold text-center">Admin Dashboard</h2>
-      <div className="container">
-        <div className="row g-4 justify-content-center">
-          {cards.map((card, i) => (
-            <div key={i} className="col-6 col-md-4 col-lg-2">
-              <Link href={card.link} className="text-decoration-none">
-                <CardItem icon={card.icon} label={card.label} />
-              </Link>
-            </div>
-          ))}
-        </div>
-      </div>
+    <>
+    
+    <div className="container-fluid py-4 px-3">
+      <h2 className="fw-bold mb-2">Welcome, {user?.firstName || 'Admin'} 👋</h2>
+      <p className="text-muted">Here's what you can manage from this dashboard:</p>
+
+      <Row className="g-4 mt-4">
+        {features.map(({ icon, title, description, color }, idx) => (
+          <Col key={idx} md={6} lg={4}>
+            <Card className="admin-feature-card h-100 shadow-sm border-0 p-4">
+              <div className="d-flex align-items-center gap-3 mb-2">
+                {icon}
+                <h5 className="mb-0">{title}</h5>
+              </div>
+              <p className="text-muted small mb-0">{description}</p>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <style jsx>{`
+        .admin-feature-card {
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+          border-radius: 0.75rem;
+        }
+
+        .admin-feature-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 1rem 1.5rem rgba(0, 0, 0, 0.08);
+        }
+      `}</style>
     </div>
+    </>
   );
 }
+
+const features = [
+  {
+    icon: <BiUserPlus size={28} className="text-primary" />,
+    title: 'Create Organizer Accounts',
+    description:
+      'Add new event organizers to the system, assign roles, and give them access to event planning tools.',
+  },
+  {
+    icon: <BiUserCircle size={28} className="text-success" />,
+    title: 'Manage User Accounts',
+    description:
+      'View, edit, or deactivate organizer accounts. Monitor account activity and roles.',
+  },
+  {
+    icon: <BiCalendarEvent size={28} className="text-warning" />,
+    title: 'Oversee Events',
+    description:
+      'Browse and manage events across the platform. Monitor statuses, edit event data, or intervene if needed.',
+  },
+  {
+    icon: <BiBarChartSquare size={28} className="text-danger" />,
+    title: 'View Analytics',
+    description:
+      'Access insights on platform usage, event performance, guest activity, and engagement trends.',
+  },
+  {
+    icon: <i className="bi bi-shield-lock text-secondary" style={{ fontSize: '1.75rem' }}></i>,
+    title: 'System Integrity',
+    description:
+      'Ensure data accuracy, enforce security rules, and maintain platform reliability for all users.',
+  },
+];
