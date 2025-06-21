@@ -779,6 +779,30 @@ app.get('/api/admin/all-organizers', requireLogin, requireAdmin, async (req,res)
     }
 });
 
+//Route to delete an event by the admin
+app.delete('/api/admin/delete-event/:eventId', requireLogin, requireAdmin, async (req,res) => {
+    const eventId = req.params.eventId;
+    try{
+        //Check if the event exists
+        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1', [eventId]);
+        if(eventCheck.rows.length === 0){
+            return res.status(404).json({
+                error: 'Event not found'
+            })
+        }
+        //Delete the event from the database
+        await db.query('DELETE FROM events WHERE event_id = $1', [eventId]);
+        res.status(200).json({
+            message: 'Event deleted successfully'
+        })
+    }catch(err){
+        console.error('Error deleting event:', err);
+        res.status(500).json({
+            error: 'Failed to delete event'
+        })
+    }
+});
+
 //Route to display upcoming events
 app.get('/api/admin/upcoming-events', requireLogin, requireAdmin, async (req,res) => {
     try{
@@ -794,6 +818,30 @@ app.get('/api/admin/upcoming-events', requireLogin, requireAdmin, async (req,res
         console.error('Error retrieving upcoming events:', err);
         res.status(500).json({
             error: 'Failed to retrieve upcoming events'
+        })
+    }
+});
+
+//Route to delete an organizer
+app.delete('/api/admin/delete-organizer/:organizerId', requireLogin, requireAdmin, async (req,res) => {
+    const organizerId = req.params.organizerId;
+    try{
+        //Check if the organizer exists
+        const organizerCheck = await db.query('SELECT * FROM users WHERE user_id = $1 AND role = $2', [organizerId, 'organizer']);
+        if(organizerCheck.rows.length === 0){
+            return res.status(404).json({
+                error: 'Organizer not found'
+            })
+        }
+        //Delete the organizer from the database
+        await db.query('DELETE FROM users WHERE user_id = $1 AND role = $2', [organizerId, 'organizer']);
+        res.status(200).json({
+            message: 'Organizer deleted successfully'
+        })
+    }catch(err){
+        console.error('Error deleting organizer:', err);
+        res.status(500).json({
+            error: 'Failed to delete organizer'
         })
     }
 });
