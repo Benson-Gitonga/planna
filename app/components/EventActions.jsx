@@ -2,27 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Table,
-  Button,
-  Spinner,
-  Alert,
-  Container,
-  OverlayTrigger,
-  Tooltip,
-  InputGroup,
-  Form,
+  Table, Button, Spinner, Alert, Container, OverlayTrigger,
+  Tooltip, InputGroup, Form, Modal
 } from 'react-bootstrap';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  FaFileUpload,
-  FaPaperPlane,
-  FaUsers,
-  FaCalendarAlt,
-  FaSort,
-  FaSortUp,
-  FaSortDown,
-  FaSearch,
+  FaFileUpload, FaPaperPlane, FaUsers, FaCalendarAlt,
+  FaSort, FaSortUp, FaSortDown, FaSearch
 } from 'react-icons/fa';
 
 export default function EventsTable() {
@@ -34,35 +21,28 @@ export default function EventsTable() {
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
 
+  const [sendingEventId, setSendingEventId] = useState(null);
+  const [invitedEvents, setInvitedEvents] = useState([]);
+
+  const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [rsvpData, setRsvpData] = useState([]);
+  const [activeRSVPEventName, setActiveRSVPEventName] = useState('');
+
   const router = useRouter();
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        // Step 1: Check session
-        const sessionRes = await fetch('http://localhost:5000/api/me', {
-          credentials: 'include',
-        });
-
-        if (sessionRes.status === 401) {
-          router.push('/login');
-          return;
-        }
+        const sessionRes = await fetch('http://localhost:5000/api/me', { credentials: 'include' });
+        if (sessionRes.status === 401) return router.push('/login');
 
         const sessionData = await sessionRes.json();
-        if (sessionData.user.role !== 'organizer') {
-          router.push('/unauthorized');
-          return;
-        }
+        if (sessionData.user.role !== 'organizer') return router.push('/unauthorized');
 
-        // Step 2: Fetch events
-        const res = await fetch('http://localhost:5000/api/events', {
-          method: 'GET',
-          credentials: 'include',
-        });
-
+        const res = await fetch('http://localhost:5000/api/events', { credentials: 'include' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to fetch events');
+
         setEvents(data.events);
         setFilteredEvents(data.events);
       } catch (err) {
@@ -71,7 +51,6 @@ export default function EventsTable() {
         setLoading(false);
       }
     };
-
     fetchEvents();
   }, [router]);
 
@@ -105,11 +84,48 @@ export default function EventsTable() {
 
   const renderSortIcon = (field) => {
     if (sortField !== field) return <FaSort className="ms-1 text-muted" />;
-    return sortDirection === 'asc' ? (
-      <FaSortUp className="ms-1 text-muted" />
-    ) : (
-      <FaSortDown className="ms-1 text-muted" />
-    );
+    return sortDirection === 'asc'
+      ? <FaSortUp className="ms-1 text-muted" />
+      : <FaSortDown className="ms-1 text-muted" />;
+  };
+
+  const handleSendInvites = async (eventId, eventName) => {
+    const confirmSend = confirm(`Send invites for ${eventName}?`);
+    if (!confirmSend) return;
+
+    setSendingEventId(eventId);
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/send_invites/${eventId}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send invites');
+
+      alert(data.message);
+      setInvitedEvents((prev) => [...prev, eventId]);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSendingEventId(null);
+    }
+  };
+
+  const handleViewRSVPs = async (eventId, eventName) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/organizer/event-rsvps/${eventId}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch RSVP data');
+
+      setRsvpData(data.rsvps);
+      setActiveRSVPEventName(eventName);
+      setShowRSVPModal(true);
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   if (loading) return <Spinner animation="border" className="d-block mx-auto mt-5" />;
@@ -156,9 +172,7 @@ export default function EventsTable() {
               <td>{event.event_name}</td>
               <td>{event.event_date}</td>
               <td>{event.location}</td>
-              <td>
-                {event.start_time} - {event.end_time}
-              </td>
+              <td>{event.start_time} - {event.end_time}</td>
               <td>
                 <div className="d-flex flex-wrap gap-2">
                   <OverlayTrigger placement="top" overlay={<Tooltip>Upload CSV File</Tooltip>}>
@@ -171,12 +185,15 @@ export default function EventsTable() {
                   </OverlayTrigger>
 
                   <OverlayTrigger placement="top" overlay={<Tooltip>Send Invites</Tooltip>}>
-                    <Link href={`/send-invites?eventId=${event.event_id}`} passHref>
-                      <Button variant="outline-success" size="sm">
-                        <FaPaperPlane className="me-1" />
-                        Invite
-                      </Button>
-                    </Link>
+                    <Button
+                      variant="outline-success"
+                      size="sm"
+                      onClick={() => handleSendInvites(event.event_id, event.event_name)}
+                      disabled={sendingEventId === event.event_id || invitedEvents.includes(event.event_id)}
+                    >
+                      <FaPaperPlane className="me-1" />
+                      {invitedEvents.includes(event.event_id) ? 'Sent' : 'Invite'}
+                    </Button>
                   </OverlayTrigger>
 
                   <OverlayTrigger placement="top" overlay={<Tooltip>View Guest List</Tooltip>}>
@@ -187,12 +204,62 @@ export default function EventsTable() {
                       </Button>
                     </Link>
                   </OverlayTrigger>
+
+                  <OverlayTrigger placement="top" overlay={<Tooltip>View RSVP Responses</Tooltip>}>
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={() => handleViewRSVPs(event.event_id, event.event_name)}
+                    >
+                      <FaUsers className="me-1" />
+                      View RSVPs
+                    </Button>
+                  </OverlayTrigger>
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
       </Table>
+
+      {/* RSVP Modal */}
+      <Modal size="lg" show={showRSVPModal} onHide={() => setShowRSVPModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>RSVP Responses - {activeRSVPEventName}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {rsvpData.length === 0 ? (
+            <p>No RSVP responses yet.</p>
+          ) : (
+            <Table striped bordered hover responsive>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Guest Name</th>
+                  <th>Email</th>
+                  <th>Category</th>
+                  <th>RSVP</th>
+                  <th>Checked In</th>
+                  <th>Seat #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rsvpData.map((rsvp, index) => (
+                  <tr key={rsvp.guest_id}>
+                    <td>{index + 1}</td>
+                    <td>{rsvp.first_name} {rsvp.last_name}</td>
+                    <td>{rsvp.email_address}</td>
+                    <td>{rsvp.category}</td>
+                    <td>{rsvp.rsvp_status}</td>
+                    <td>{rsvp.check_in_status ? 'Yes' : 'No'}</td>
+                    <td>{rsvp.seat_number || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Modal.Body>
+      </Modal>
     </Container>
   );
 }
