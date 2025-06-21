@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Form, Button, Alert, Container, Row, Col, Spinner, ProgressBar } from 'react-bootstrap';
+import {
+  Form,
+  Button,
+  Alert,
+  Container,
+  Row,
+  Col,
+  Spinner,
+  ProgressBar,
+} from 'react-bootstrap';
 
 export default function UploadCsvForm() {
   const [file, setFile] = useState(null);
@@ -18,19 +27,15 @@ export default function UploadCsvForm() {
 
   useEffect(() => {
     const idFromURL = searchParams.get('eventId');
-    if (idFromURL) {
-      setEventId(idFromURL);
-    }
+    if (idFromURL) setEventId(idFromURL);
   }, [searchParams]);
 
   useEffect(() => {
     let timer;
     if (showProgress && progress > 0) {
-      timer = setTimeout(() => setProgress((prev) => prev - 2), 40); // 40ms * 50 = 2 seconds
+      timer = setTimeout(() => setProgress((prev) => prev - 2), 30); // smoother 1.5s
     }
-    if (progress <= 0) {
-      router.push('/organizer');
-    }
+    if (progress <= 0) router.push('/organizer');
     return () => clearTimeout(timer);
   }, [showProgress, progress, router]);
 
@@ -45,7 +50,7 @@ export default function UploadCsvForm() {
     setLoading(true);
 
     if (!file || !eventId) {
-      setError('Both event ID and CSV file are required.');
+      setError('Both Event ID and CSV file are required.');
       setLoading(false);
       return;
     }
@@ -61,21 +66,17 @@ export default function UploadCsvForm() {
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to upload CSV');
-      }
-
-      setSuccess(`Successfully uploaded ${data.totalInserted} rows.`);
-      if (data.failedRows) {
-        setSuccess(prev => prev + ` Some rows failed (${data.failedRows.length}).`);
+      setSuccess(`Uploaded ${data.totalInserted} guests.`);
+      if (data.failedRows?.length) {
+        setSuccess((prev) => prev + ` ${data.failedRows.length} rows failed.`);
       }
 
       setFile(null);
-      setShowProgress(true); // start progress bar
-
+      setShowProgress(true);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Upload failed');
     } finally {
       setLoading(false);
     }
@@ -83,75 +84,81 @@ export default function UploadCsvForm() {
 
   return (
     <>
-      {/* ✅ Top-right countdown progress bar */}
+      {/* Progress Bar Top-right */}
       {showProgress && (
         <div style={{
           position: 'fixed',
           top: '20px',
           right: '20px',
-          width: '300px',
-          zIndex: 9999
+          width: '250px',
+          zIndex: 1050
         }}>
           <ProgressBar
             now={progress}
             label={`${Math.ceil(progress)}%`}
-            animated
             variant="success"
             striped
+            animated
           />
         </div>
       )}
 
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <Row className="w-100 justify-content-center">
-          <Col md={8} lg={6}>
-            <div className="border p-4 rounded bg-white shadow">
-              <h2 className="text-center mb-4">Upload CSV for Event</h2>
+      <Container fluid className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh', background: '#f8f9fc' }}>
+        <Row className="shadow-lg bg-white rounded-4 overflow-hidden w-100" style={{ maxWidth: '900px' }}>
+          
+          {/* Left section - illustration or info */}
+          <Col md={5} className="d-none d-md-flex bg-primary text-white align-items-center justify-content-center p-4">
+            <div className="text-center">
+              <h4 className="fw-bold mb-3">Upload Guests List</h4>
+              <p className="small mb-0">Make sure your CSV has valid headers like <strong>name</strong>, <strong>email</strong>, etc.</p>
+            </div>
+          </Col>
 
-              {error && <Alert variant="danger">{error}</Alert>}
-              {success && <Alert variant="success">{success}</Alert>}
+          {/* Right section - form */}
+          <Col xs={12} md={7} className="p-4">
+            <h4 className="text-center mb-4 fw-bold">Upload CSV for Event</h4>
 
-              <Form onSubmit={handleSubmit}>
-                {!searchParams.get('eventId') && (
-                  <Form.Group className="mb-3">
-                    <Form.Label>Event ID</Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="Enter Event ID"
-                      value={eventId}
-                      onChange={(e) => setEventId(e.target.value)}
-                      required
-                    />
-                  </Form.Group>
-                )}
+            {error && <Alert variant="danger" className="text-center">{error}</Alert>}
+            {success && <Alert variant="success" className="text-center">{success}</Alert>}
 
-                <Form.Group className="mb-4">
-                  <Form.Label>CSV File</Form.Label>
+            <Form onSubmit={handleSubmit}>
+              {!searchParams.get('eventId') && (
+                <Form.Group className="mb-3">
+                  <Form.Label>Event ID</Form.Label>
                   <Form.Control
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileChange}
+                    type="text"
+                    placeholder="Enter Event ID"
+                    value={eventId}
+                    onChange={(e) => setEventId(e.target.value)}
                     required
                   />
                 </Form.Group>
+              )}
 
-                <Button type="submit" disabled={loading} className="w-100">
-                  {loading ? (
-                    <>
-                      <Spinner
-                        as="span"
-                        animation="border"
-                        size="sm"
-                        role="status"
-                        aria-hidden="true"
-                        className="me-2"
-                      />
-                      Uploading...
-                    </>
-                  ) : 'Upload CSV'}
-                </Button>
-              </Form>
-            </div>
+              <Form.Group controlId="formFile" className="mb-4">
+                <Form.Label>Choose CSV File</Form.Label>
+                <Form.Control
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  required
+                />
+              </Form.Group>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                variant="primary"
+                className="w-100 fw-semibold"
+              >
+                {loading ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Uploading...
+                  </>
+                ) : 'Upload CSV'}
+              </Button>
+            </Form>
           </Col>
         </Row>
       </Container>

@@ -81,7 +81,7 @@ export default function CreateEvent() {
   };
 
   return (
-    <Container className="py-3">
+    <Container className="py-1">
       <Row className="justify-content-center">
         <Col md={8} lg={6} xl={5}>
           <Card className="shadow-lg border-0">

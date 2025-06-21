@@ -13,6 +13,7 @@ import {
   Form,
 } from 'react-bootstrap';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   FaFileUpload,
   FaPaperPlane,
@@ -33,25 +34,46 @@ export default function EventsTable() {
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
 
+  const router = useRouter();
+
   useEffect(() => {
     const fetchEvents = async () => {
       try {
+        // Step 1: Check session
+        const sessionRes = await fetch('http://localhost:5000/api/me', {
+          credentials: 'include',
+        });
+
+        if (sessionRes.status === 401) {
+          router.push('/login');
+          return;
+        }
+
+        const sessionData = await sessionRes.json();
+        if (sessionData.user.role !== 'organizer') {
+          router.push('/unauthorized');
+          return;
+        }
+
+        // Step 2: Fetch events
         const res = await fetch('http://localhost:5000/api/events', {
           method: 'GET',
           credentials: 'include',
         });
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to fetch events');
         setEvents(data.events);
         setFilteredEvents(data.events);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Something went wrong');
       } finally {
         setLoading(false);
       }
     };
+
     fetchEvents();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     const term = searchTerm.toLowerCase();

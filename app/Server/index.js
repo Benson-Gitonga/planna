@@ -759,6 +759,26 @@ app.get('/api/admin/most-active-organizers', requireLogin, requireAdmin, async (
     }
 })
 
+//Route to get all the organizers in the application
+app.get('/api/admin/all-organizers', requireLogin, requireAdmin, async (req,res) => {
+    try{
+        const result = await db.query('SELECT user_id, first_name, last_name, email FROM users WHERE role = $1', ['organizer']);
+        if(result.rows.length === 0){
+            return res.status(404).json({
+                message: 'No organizers found'
+            })
+        }
+        res.status(200).json({
+            organizers: result.rows
+        })
+    }catch(err){
+        console.error('Error retrieving organizers:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve organizers'
+        })
+    }
+});
+
 //Route to display upcoming events
 app.get('/api/admin/upcoming-events', requireLogin, requireAdmin, async (req,res) => {
     try{
