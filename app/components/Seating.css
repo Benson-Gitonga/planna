@@ -1,0 +1,13 @@
+.seat-box {
+  width: 120px;
+  height: 100px;
+  border: 2px dashed #ccc;
+  transition: background-color 0.3s ease;
+}
+.seat-box:hover {
+  background-color: #f0f8ff;
+}
+.seat-box.selected {
+  background-color: #add8e6;
+  border-color: #0000ff;
+}

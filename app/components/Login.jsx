@@ -5,10 +5,10 @@ import { Form, Button, Container, Row, Col, Alert, Spinner } from 'react-bootstr
 import { useRouter } from 'next/navigation';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState('');        // ✅ Track email input
+  const [password, setPassword] = useState('');  // ✅ Track password input
+  const [loading, setLoading] = useState(false); // ✅ For loading spinner state
+  const [error, setError] = useState('');        // ✅ To show login errors
   const router = useRouter();
 
   const handleSubmit = async (e) => {
@@ -30,7 +30,7 @@ export default function Login() {
 
       if (!response.ok) throw new Error(data.error || 'Login failed');
 
-      // Role-based redirection
+      // ✅ Role-based redirection
       switch (data.user.role.toLowerCase()) {
         case 'admin':
           router.push('/admin');
@@ -49,10 +49,13 @@ export default function Login() {
   };
 
   return (
-    <Container fluid className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh', backgroundColor: '#f8f9fc' }}>
+    <Container
+      fluid
+      className="d-flex align-items-center justify-content-center"
+      style={{ minHeight: '100vh', backgroundColor: '#f8f9fc' }}
+    >
       <Row className="shadow-lg rounded-4 overflow-hidden bg-white w-100" style={{ maxWidth: '850px' }}>
-        
-        {/* Left side (illustration or welcome) */}
+        {/* Left side */}
         <Col md={5} className="d-none d-md-flex align-items-center justify-content-center bg-primary text-white p-4">
           <div className="text-center">
             <h2 className="fw-bold">Welcome Back!</h2>
@@ -60,7 +63,7 @@ export default function Login() {
           </div>
         </Col>
 
-        {/* Right side (form) */}
+        {/* Right side - Form */}
         <Col xs={12} md={7} className="p-4">
           <h3 className="fw-bold text-center mb-4">Sign In</h3>
 
@@ -104,7 +107,9 @@ export default function Login() {
             </Button>
 
             <div className="text-center mt-3">
-              <a href="/register" className="text-decoration-none text-primary small">Don't have an account? Register</a>
+              <a href="/register" className="text-decoration-none text-primary small">
+                Don't have an account? Register
+              </a>
             </div>
           </Form>
         </Col>
