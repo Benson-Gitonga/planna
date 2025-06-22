@@ -3,7 +3,8 @@
 import 'bootswatch/dist/flatly/bootstrap.min.css';
 import './global.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import 'aos/dist/aos.css'; // <-- Import AOS CSS
+import 'aos/dist/aos.css'; 
+import './components/seating.css'; 
 
 import Footer from './components/Footer';
 import AOS from 'aos';
