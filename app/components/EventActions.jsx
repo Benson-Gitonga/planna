@@ -22,7 +22,9 @@ export default function EventsTable() {
   const [sortDirection, setSortDirection] = useState('asc');
 
   const [sendingEventId, setSendingEventId] = useState(null);
+  const [sendingFinalEventId, setSendingFinalEventId] = useState(null);
   const [invitedEvents, setInvitedEvents] = useState([]);
+  const [finalEmailSentEvents, setFinalEmailSentEvents] = useState([]);
 
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [rsvpData, setRsvpData] = useState([]);
@@ -112,6 +114,33 @@ export default function EventsTable() {
     }
   };
 
+  const handleSendFinalEmail = async (eventId, eventName) => {
+    const confirmSend = confirm(
+      `Are you sure you want to send the final email for "${eventName}"?\n\n` +
+      'This email will contain each guest’s assigned seat number and QR code for check-in. ' +
+      'Make sure everything is finalized before sending.'
+    );
+    if (!confirmSend) return;
+
+    setSendingFinalEventId(eventId);
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/organizer/send-final-email/${eventId}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send final email');
+
+      alert(data.message);
+      setFinalEmailSentEvents(prev => [...prev, eventId]);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSendingFinalEventId(null);
+    }
+  };
+
   const handleViewRSVPs = async (eventId, eventName) => {
     try {
       const res = await fetch(`http://localhost:5000/api/organizer/event-rsvps/${eventId}`, {
@@ -196,6 +225,18 @@ export default function EventsTable() {
                     </Button>
                   </OverlayTrigger>
 
+                  <OverlayTrigger placement="top" overlay={<Tooltip>Final Email with QR Code</Tooltip>}>
+                    <Button
+                      variant={finalEmailSentEvents.includes(event.event_id) ? 'success' : 'outline-danger'}
+                      size="sm"
+                      onClick={() => handleSendFinalEmail(event.event_id, event.event_name)}
+                      disabled={sendingFinalEventId === event.event_id || finalEmailSentEvents.includes(event.event_id)}
+                    >
+                      <FaPaperPlane className="me-1" />
+                      {finalEmailSentEvents.includes(event.event_id) ? 'Final Sent' : 'Final Email'}
+                    </Button>
+                  </OverlayTrigger>
+
                   <OverlayTrigger placement="top" overlay={<Tooltip>View Guest List</Tooltip>}>
                     <Link href={`/organizer/guest-list/${event.event_id}`} passHref>
                       <Button variant="outline-info" size="sm">
@@ -215,6 +256,7 @@ export default function EventsTable() {
                       View RSVPs
                     </Button>
                   </OverlayTrigger>
+
                   <OverlayTrigger placement="top" overlay={<Tooltip>Seating Arrangement</Tooltip>}>
                     <Link href={`/organizer/seating/${event.event_id}`} passHref>
                       <Button variant="outline-warning" size="sm">

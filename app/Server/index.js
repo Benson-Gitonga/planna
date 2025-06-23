@@ -1140,7 +1140,7 @@ app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrgani
             SELECT first_name, last_name, email_address, seat_number, qr_code            
             FROM guests
             WHERE event_id = $1 AND rsvp_status = $2 AND seat_number IS NOT NULL AND qr_code IS NOT NULL
-            `, [eventId]);
+            `, [eventId, 'accepted']);
             if(guestRes.rows.length === 0){
                 return res.status(404).json({
                     message: 'No guests found with accepted RSVP and assigned seats'
