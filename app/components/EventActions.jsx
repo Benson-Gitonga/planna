@@ -220,11 +220,26 @@ export default function EventsTable() {
                       onClick={() => handleSendInvites(event.event_id, event.event_name)}
                       disabled={sendingEventId === event.event_id || invitedEvents.includes(event.event_id)}
                     >
-                      <FaPaperPlane className="me-1" />
-                      {invitedEvents.includes(event.event_id) ? 'Sent' : 'Invite'}
+                      {sendingEventId === event.event_id ? (
+                        <>
+                          <Spinner
+                            as="span"
+                            animation="border"
+                            size="sm"
+                            role="status"
+                            aria-hidden="true"
+                            className="me-1"
+                          />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <FaPaperPlane className="me-1" />
+                          {invitedEvents.includes(event.event_id) ? 'Sent' : 'Invite'}
+                        </>
+                      )}
                     </Button>
                   </OverlayTrigger>
-
 
                   <OverlayTrigger placement="top" overlay={<Tooltip>View Guest List</Tooltip>}>
                     <Link href={`/organizer/guest-list/${event.event_id}`} passHref>
@@ -255,7 +270,6 @@ export default function EventsTable() {
                     </Link>
                   </OverlayTrigger>
 
-                  
                   <OverlayTrigger placement="top" overlay={<Tooltip>Final Email with QR Code</Tooltip>}>
                     <Button
                       variant={finalEmailSentEvents.includes(event.event_id) ? 'success' : 'outline-danger'}
@@ -263,11 +277,26 @@ export default function EventsTable() {
                       onClick={() => handleSendFinalEmail(event.event_id, event.event_name)}
                       disabled={sendingFinalEventId === event.event_id || finalEmailSentEvents.includes(event.event_id)}
                     >
-                      <FaPaperPlane className="me-1" />
-                      {finalEmailSentEvents.includes(event.event_id) ? 'Final Sent' : 'Final Email'}
+                      {sendingFinalEventId === event.event_id ? (
+                        <>
+                          <Spinner
+                            as="span"
+                            animation="border"
+                            size="sm"
+                            role="status"
+                            aria-hidden="true"
+                            className="me-1"
+                          />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <FaPaperPlane className="me-1" />
+                          {finalEmailSentEvents.includes(event.event_id) ? 'Final Sent' : 'Final Email'}
+                        </>
+                      )}
                     </Button>
                   </OverlayTrigger>
-                  
                 </div>
               </td>
             </tr>
