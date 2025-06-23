@@ -1205,7 +1205,7 @@ app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrgani
 
 // Route to update check-in status when QR code is scanned
 app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async (req, res) => {
-  const { qr_code } = req.body;
+  const { qr_code } = req.body; // This should be the decoded UUID string from the QR scanner
   const organizerId = req.session.user.id;
 
   if (!qr_code) {
@@ -1213,12 +1213,12 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
   }
 
   try {
-    // Retrieve guest and associated event
+    // Retrieve guest and associated event using the access_code (UUID)
     const result = await db.query(`
       SELECT g.guest_id, g.check_in_status, e.organizer_id, e.event_date, e.end_time
       FROM guests g
       JOIN events e ON g.event_id = e.event_id
-      WHERE g.qr_code = $1
+      WHERE g.access_code = $1
     `, [qr_code]);
 
     if (result.rows.length === 0) {
@@ -1250,7 +1250,7 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
     await db.query(`
       UPDATE guests
       SET check_in_status = TRUE
-      WHERE qr_code = $1
+      WHERE access_code = $1
     `, [qr_code]);
 
     res.status(200).json({ message: 'Guest checked in successfully' });
@@ -1259,12 +1259,7 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
     console.error('Check-in error:', err);
     res.status(500).json({ error: 'Failed to check in guest' });
   }
-});
-
-
-
-
-    
+});    
 //Administrator routes
 
 //Route to get the total event count in the application
