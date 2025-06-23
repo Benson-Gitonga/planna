@@ -215,16 +215,14 @@ export default function EventsTable() {
                       View RSVPs
                     </Button>
                   </OverlayTrigger>
-
                   <OverlayTrigger placement="top" overlay={<Tooltip>Seating Arrangement</Tooltip>}>
-  <Link href={`/organizer/seating?eventId=${event.event_id}`} passHref>
-    <Button variant="outline-warning" size="sm">
-      <i className="bi bi-grid-3x3-gap me-1"></i>
-      Seating
-    </Button>
-  </Link>
-</OverlayTrigger>
-
+                    <Link href={`/organizer/seating/${event.event_id}`} passHref>
+                      <Button variant="outline-warning" size="sm">
+                        <i className="bi bi-grid-3x3-gap me-1"></i>
+                        Seating
+                      </Button>
+                    </Link>
+                  </OverlayTrigger>
                 </div>
               </td>
             </tr>

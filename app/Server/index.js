@@ -777,255 +777,258 @@ app.get('/api/guest-responses/:eventId', requireLogin, requireOrganizer, async (
 })
 
 //Route to allow the organizer to create a new seating configuration for an event
-app.post('/api/seating/:eventId', requireLogin, requireOrganizer, async (req,res) => {
-    const eventId = req.params.eventId;
-    const organizerId = req.session.user.id;
-    const {
-        layoutType, //'table' or 'rows'
-        table_count, //Number of tables if layoutType is 'table'
-        seats_per_table, //Number of seats per table if layoutType is 'table'
-        number_of_rows, //Number of rows if layoutType is 'rows'
-        seats_per_row //Number of seats per row if layoutType is 'rows'
-    } = req.body;
-    try{
-        //Check if the event exists and belongs to the current organizer
-        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
-        if(eventCheck.rows.length === 0){
-            //If the event does not exist or does not belong to the organizer, return an error
-            return res.status(403).json({
-                error: 'Unauthorized to create seating configuration for this event'    
-            })
-        }
-        //Validate the seating configuration based on layout type
-        if(layoutType === 'table'){
-            if(!table_count || !seats_per_table){
-                return res.status(400).json({
-                    error: 'For table layout, both table_count and seats_per_table are required'
-                })
-            }
-            if(table_count <= 0 || seats_per_table <= 0){
-                return res.status(400).json({
-                    error: 'Table count and seats per table must be greater than zero'
-                })
-            }
-            //Insert the seating configuration into the database
-            const seatingResult = await db.query(`
-                INSERT INTO seating_configurations (event_id, layout_type, table_count, seats_per_table)
-                VALUES ($1, $2, $3, $4) RETURNING *
-            `, [eventId, layoutType, table_count, seats_per_table]);
-            res.status(201).json({
-                message: 'Seating configuration created successfully',
-                seating_configuration: seatingResult.rows[0]
-            })
-        }
-        else if(layoutType === 'rows'){
-            if(!number_of_rows || !seats_per_row){
-                return res.status(400).json({
-                    error: 'For row layout, both number_of_rows and seats_per_row are required'
-                })
-            }
-            if(number_of_rows <= 0 || seats_per_row <= 0){
-                return res.status(400).json({
-                    error: 'Number of rows and seats per row must be greater than zero'
-                })
-            }
-            //Insert the seating configuration into the database
-            const seatingResult = await db.query(`
-                INSERT INTO seating_configurations (event_id, layout_type, number_of_rows, seats_per_row)
-                VALUES ($1, $2, $3, $4) RETURNING *
-            `, [eventId, layoutType, number_of_rows, seats_per_row]);
-            res.status(201).json({
-                message: 'Seating configuration created successfully',
-                seating_configuration: seatingResult.rows[0]
-            })
-        }
-        else {
-            return res.status(400).json({
-                error: 'Invalid layout type. Must be either "table" or "rows"'
-            })
-        }
-    }catch(err){
-        console.error('Error creating seating configuration:', err);
-        res.status(500).json({
-            error: 'Failed to create seating configuration'
-        })
+// app.post('/api/seating/guest/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+//   const eventId = req.params.eventId;
+//   const organizerId = req.session.user.id;
+//   const {
+//     table_count,
+//     seats_per_table,
+//     number_of_rows,
+//     seats_per_row
+//   } = req.body;
+
+//   try {
+//     const eventCheck = await db.query(
+//       'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+//       [eventId, organizerId]
+//     );
+//     if (eventCheck.rows.length === 0) {
+//       return res.status(403).json({ error: 'Unauthorized to create configuration for this event' });
+//     }
+
+//     const existing = await db.query(
+//       'SELECT * FROM seating_configurations WHERE event_id = $1',
+//       [eventId]
+//     );
+//     if (existing.rows.length > 0) {
+//       return res.status(409).json({ error: 'Configuration already exists for this event' });
+//     }
+
+//     if (table_count && seats_per_table) {
+//       const result = await db.query(`
+//         INSERT INTO seating_configurations (event_id, table_count, seats_per_table)
+//         VALUES ($1, $2, $3) RETURNING *`,
+//         [eventId, table_count, seats_per_table]
+//       );
+//       return res.status(201).json({
+//         message: 'Seating configuration (table layout) created',
+//         seating_configuration: result.rows[0]
+//       });
+//     }
+
+//     if (number_of_rows && seats_per_row) {
+//       const result = await db.query(`
+//         INSERT INTO seating_configurations (event_id, number_of_rows, seats_per_row)
+//         VALUES ($1, $2, $3) RETURNING *`,
+//         [eventId, number_of_rows, seats_per_row]
+//       );
+//       return res.status(201).json({
+//         message: 'Seating configuration (row layout) created',
+//         seating_configuration: result.rows[0]
+//       });
+//     }
+
+//     return res.status(400).json({ error: 'Invalid configuration input' });
+//   } catch (err) {
+//     console.error('Create seating config error:', err);
+//     res.status(500).json({ error: 'Internal server error' });
+//   }
+// });
+app.post('/api/seating/guest/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+  const eventId = req.params.eventId;
+  const organizerId = req.session.user.id;
+  const { table_count, seats_per_table, number_of_rows, seats_per_row } = req.body;
+
+  console.log(`[POST] Create seating config for event ${eventId} by organizer ${organizerId}`);
+  console.log('Request body:', req.body);
+
+  try {
+    const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+    if (eventCheck.rows.length === 0) {
+      console.warn('Unauthorized: Organizer does not own this event.');
+      return res.status(403).json({ error: 'Unauthorized to create configuration for this event' });
     }
-})
+
+    const existing = await db.query('SELECT * FROM seating_configurations WHERE event_id = $1', [eventId]);
+    if (existing.rows.length > 0) {
+      console.warn('Conflict: Configuration already exists.');
+      return res.status(409).json({ error: 'Configuration already exists for this event' });
+    }
+
+    if (table_count && seats_per_table) {
+      const result = await db.query(`INSERT INTO seating_configurations (event_id, table_count, seats_per_table) VALUES ($1, $2, $3) RETURNING *`, [eventId, table_count, seats_per_table]);
+      console.log('Table layout created:', result.rows[0]);
+      return res.status(201).json({ message: 'Seating configuration (table layout) created', seating_configuration: result.rows[0] });
+    }
+
+    if (number_of_rows && seats_per_row) {
+      const result = await db.query(`INSERT INTO seating_configurations (event_id, number_of_rows, seats_per_row) VALUES ($1, $2, $3) RETURNING *`, [eventId, number_of_rows, seats_per_row]);
+      console.log('Row layout created:', result.rows[0]);
+      return res.status(201).json({ message: 'Seating configuration (row layout) created', seating_configuration: result.rows[0] });
+    }
+
+    console.warn('Bad Request: Invalid configuration input.');
+    return res.status(400).json({ error: 'Invalid configuration input' });
+
+  } catch (err) {
+    console.error('Create seating config error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
         
 
 //Route to allow the organizer to update an existing seating configuration for an event
-app.put('/api/seating/:eventId', requireLogin, requireOrganizer, async (req,res) => {
-    const eventId = req.params.eventId;
-    const organizerId = req.session.user.id;
-    const {
-        layoutType, //'table' or 'rows'
-        table_count, //Number of tables if layoutType is 'table'
-        seats_per_table, //Number of seats per table if layoutType is 'table'
-        number_of_rows, //Number of rows if layoutType is 'rows'
-        seats_per_row //Number of seats per row if layoutType is 'rows'
-    } = req.body;
-    try{
-        //Check if the event exists and belongs to the current organizer
-        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
-        if(eventCheck.rows.length === 0){
-            //If the event does not exist or does not belong to the organizer, return an error
-            return res.status(403).json({
-                error: 'Unauthorized to update seating configuration for this event'
-            })
-        }
-        //Check if the seating configuration exists for the event
-        const seatingCheck = await db.query('SELECT * FROM seating_configurations WHERE event_id = $1', [eventId]);
-        if(seatingCheck.rows.length === 0){
-            return res.status(404).json({
-                error: 'No seating configuration found for this event'
-            })
-        }
-        //Validate the seating configuration based on layout type
-        if(layoutType === 'table'){ 
-            if(!table_count || !seats_per_table){
-                return res.status(400).json({
-                    error: 'For table layout, both table_count and seats_per_table are required'
-                })
-            }
-            if(table_count <= 0 || seats_per_table <= 0){
-                return res.status(400).json({
-                    error: 'Table count and seats per table must be greater than zero'
-                })
-            }
-            //Update the seating configuration in the database
-            const seatingUpdate = await db.query(`
-                UPDATE seating_configurations 
-                SET layout_type = $1, table_count = $2, seats_per_table = $3
-                WHERE event_id = $4 RETURNING *
-            `, [layoutType, table_count, seats_per_table, eventId]);
-            res.status(200).json({
-                message: 'Seating configuration updated successfully',
-                seating_configuration: seatingUpdate.rows[0]
-            })
-        }
-        else if(layoutType === 'rows'){
-            if(!number_of_rows || !seats_per_row){
-                return res.status(400).json({
-                    error: 'For row layout, both number_of_rows and seats_per_row are required'
-                })
-            }
-            if(number_of_rows <= 0 || seats_per_row <= 0){
-                return res.status(400).json({
-                    error: 'Number of rows and seats per row must be greater than zero'
-                })
-            }
-            //Update the seating configuration in the database
-            const seatingUpdate = await db.query(`
-                UPDATE seating_configurations
-                SET layout_type = $1, number_of_rows = $2, seats_per_row = $3
-                WHERE event_id = $4 RETURNING *
-            `, [layoutType, number_of_rows, seats_per_row, eventId]);
-            res.status(200).json({
-                message: 'Seating configuration updated successfully',
-                seating_configuration: seatingUpdate.rows[0]
-            })
-        }
-        else {
-            return res.status(400).json({
-                error: 'Invalid layout type. Must be either "table" or "rows"'
-            })
-        }
-    }catch(err){
-        console.error('Error updating seating configuration:', err);
-        res.status(500).json({
-            error: 'Failed to update seating configuration'
-        })
+app.put('/api/seating/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+  const eventId = req.params.eventId;
+  const organizerId = req.session.user.id;
+  const {
+    table_count,
+    seats_per_table,
+    number_of_rows,
+    seats_per_row
+  } = req.body;
+
+  try {
+    const eventCheck = await db.query(
+      'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+    if (eventCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Unauthorized to update configuration' });
     }
+
+    const configCheck = await db.query(
+      'SELECT * FROM seating_configurations WHERE event_id = $1',
+      [eventId]
+    );
+    if (configCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'No configuration exists to update' });
+    }
+
+    if (table_count && seats_per_table) {
+      const result = await db.query(`
+        UPDATE seating_configurations
+        SET table_count = $1, seats_per_table = $2, number_of_rows = NULL, seats_per_row = NULL
+        WHERE event_id = $3 RETURNING *`,
+        [table_count, seats_per_table, eventId]
+      );
+      return res.status(200).json({
+        message: 'Updated to table layout',
+        seating_configuration: result.rows[0]
+      });
+    }
+
+    if (number_of_rows && seats_per_row) {
+      const result = await db.query(`
+        UPDATE seating_configurations
+        SET number_of_rows = $1, seats_per_row = $2, table_count = NULL, seats_per_table = NULL
+        WHERE event_id = $3 RETURNING *`,
+        [number_of_rows, seats_per_row, eventId]
+      );
+      return res.status(200).json({
+        message: 'Updated to row layout',
+        seating_configuration: result.rows[0]
+      });
+    }
+
+    return res.status(400).json({ error: 'Invalid update input' });
+  } catch (err) {
+    console.error('Update seating config error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
+
 
 //Route to retrieve the current seating configuration and assigned guests for an event
-app.get('/api/seating/:eventId', requireLogin, requireOrganizer, async (req,res) => {
-    const eventId = req.params.eventId;
-    const organizerId = req.session.user.id;
-    try{
-        //Check if the event exists and belongs to the current organizer
-        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
-        if(eventCheck.rows.length === 0){
-            //If the event does not exist or does not belong to the organizer, return an error
-            return res.status(403).json({
-                error: 'Unauthorized to view seating configuration for this event'
-            })
-        }
-        //Querying the database to get the seating configuration for the event
-        const seatingConfig = await db.query('SELECT * FROM seating_configurations WHERE event_id = $1', [eventId]);
-        if(seatingConfig.rows.length === 0){
-            return res.status(404).json({
-                message: 'No seating configuration found for this event'
-            })
-        }
-        //Querying the database to get the assigned guests for the event
-        const assignedGuests = await db.query(`
-            SELECT g.guest_id, g.first_name, g.last_name, g.email_address, g.category, g.seat_number
-            FROM guests g
-            JOIN seating_configurations s ON g.event_id = s.event_id
-            WHERE g.event_id = $1
-        `, [eventId]);
-        //Sending the seating configuration and assigned guests as a response
-        res.status(200).json({
-            message: 'Seating configuration and assigned guests retrieved successfully',
-            seating_configuration: seatingConfig.rows[0],
-            assigned_guests: assignedGuests.rows
-        })
-    }catch(err){
-        console.error('Error retrieving seating configuration:', err);
-        res.status(500).json({
-            error: 'Failed to retrieve seating configuration'
-        })
+app.get('/api/seating/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+  const eventId = req.params.eventId;
+  const organizerId = req.session.user.id;
+
+  try {
+    const eventCheck = await db.query(
+      'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+    if (eventCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Unauthorized' });
     }
-})
+
+    const seatingConfig = await db.query(
+      'SELECT * FROM seating_configurations WHERE event_id = $1',
+      [eventId]
+    );
+
+    if (seatingConfig.rows.length === 0) {
+      return res.status(200).json({
+        hasConfiguration: false,
+        seating_configuration: null,
+        assigned_guests: []
+      });
+    }
+
+    const assignedGuests = await db.query(`
+      SELECT g.guest_id, g.first_name, g.last_name, g.email_address, g.category, g.seat_number
+      FROM guests g
+      WHERE g.event_id = $1`,
+      [eventId]
+    );
+
+    res.status(200).json({
+      hasConfiguration: true,
+      seating_configuration: seatingConfig.rows[0],
+      assigned_guests: assignedGuests.rows
+    });
+  } catch (err) {
+    console.error('Get seating config error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 //Route to update a guest's seat number (after dragging them to a new spot)
-app.put('/api/seating/:eventId/guest/:guestId', requireLogin, requireOrganizer, async (req,res) => {
-    const eventId = req.params.eventId;
-    const guestId = req.params.guestId;
-    const organizerId = req.session.user.id;
-    const {newSeatNumber} = req.body;
-    if(!newSeatNumber){
-        //If new seat number is not provided, return an error
-        return res.status(400).json({
-            error: 'New seat number is required'
-        })
+app.put('/api/seating/:eventId/guest/:guestId', requireLogin, requireOrganizer, async (req, res) => {
+  const eventId = req.params.eventId;
+  const guestId = req.params.guestId;
+  const organizerId = req.session.user.id;
+  const { newSeatNumber } = req.body;
+
+  if (!newSeatNumber) {
+    return res.status(400).json({ error: 'New seat number is required' });
+  }
+
+  try {
+    const eventCheck = await db.query(
+      'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+    if (eventCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Unauthorized to update guest for this event' });
     }
-    try{
-        //Check if the event exists and belongs to the current organizer
-        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
-        if(eventCheck.rows.length === 0){
-            //If the event does not exist or does not belong to the organizer, return an error
-            return res.status(403).json({
-                error: 'Unauthorized to update seating for this event'
-            })
-        }
-        //Check if the guest exists in the guests table for the event
-        const guestCheck = await db.query('SELECT * FROM guests WHERE guest_id = $1 AND event_id = $2', [guestId, eventId]);
-        if(guestCheck.rows.length === 0){
-            //If the guest does not exist in the guests table, return an error
-            return res.status(404).json({
-                error: 'Guest not found for this event'
-            })
-        }
-        //Update the seat number for the guest
-        const update = await db.query('UPDATE guests SET seat_number = $1 WHERE guest_id = $2 AND event_id = $3', [newSeatNumber, guestId, eventId]);
-        if(update.rows.length === 0){
-            return res.status(404).json({
-                error: 'Failed to update seat number. Guest not found or already updated'
-            })
-        }
-        return res.status(200).json({
-            message: `Seat number updated successfully for guest ${guestId}`,
-            guest: update.rows[0]
-        })
-    }catch(err){
-        console.error('Error updating seat number:', err);
-        res.status(500).json({
-            error: 'Failed to update seat number'
-        })
+
+    const guestCheck = await db.query(
+      'SELECT * FROM guests WHERE guest_id = $1 AND event_id = $2',
+      [guestId, eventId]
+    );
+    if (guestCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Guest not found for this event' });
     }
+
+    const update = await db.query(
+      'UPDATE guests SET seat_number = $1 WHERE guest_id = $2 AND event_id = $3 RETURNING *',
+      [newSeatNumber, guestId, eventId]
+    );
+
+    res.status(200).json({
+      message: `Guest ${guestId} seat updated`,
+      guest: update.rows[0]
+    });
+  } catch (err) {
+    console.error('Error updating seat:', err);
+    res.status(500).json({ error: 'Failed to update seat number' });
+  }
 });
+
 
 //Route to automatically assign seats to guests who dont yet have one
 app.post('/api/seating/:eventId/auto-assign', requireLogin, requireOrganizer, async (req, res) => {
@@ -1033,100 +1036,88 @@ app.post('/api/seating/:eventId/auto-assign', requireLogin, requireOrganizer, as
   const organizerId = req.session.user.id;
 
   try {
-    // Verify the event exists and belongs to the logged-in organizer
     const eventCheck = await db.query(
       'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
       [eventId, organizerId]
     );
     if (eventCheck.rows.length === 0) {
-      return res.status(403).json({ error: 'Unauthorized to auto-assign seats for this event' });
+      return res.status(403).json({ error: 'Unauthorized to auto-assign seats' });
     }
 
-    // Check if a seating configuration exists
-    const seatingConfig = await db.query(
+    const configResult = await db.query(
       'SELECT * FROM seating_configurations WHERE event_id = $1',
       [eventId]
     );
-    if (seatingConfig.rows.length === 0) {
-      return res.status(404).json({ error: 'No seating configuration found for this event' });
+    if (configResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No seating configuration found' });
     }
 
-    const { layout_type, table_count, seats_per_table, number_of_rows, seats_per_row } = seatingConfig.rows[0];
+    const config = configResult.rows[0];
+    const { table_count, seats_per_table, number_of_rows, seats_per_row } = config;
 
-    // Get unseated guests
-    const guestsWithoutSeats = await db.query(
-      'SELECT * FROM guests WHERE event_id = $1 AND seat_number IS NULL',
-      [eventId]
-    );
-    if (guestsWithoutSeats.rows.length === 0) {
-      return res.status(200).json({ message: 'All guests already have seat numbers assigned' });
-    }
+    // Generate seat labels
+    let allSeats = [];
 
-    // Generate all possible seat labels
-    let allPossibleSeats = [];
-    if (layout_type === 'table') {
+    if (table_count && seats_per_table) {
       for (let t = 1; t <= table_count; t++) {
         for (let s = 1; s <= seats_per_table; s++) {
-          allPossibleSeats.push(`Table ${t} - Seat ${s}`);
+          allSeats.push(`Table ${t} - Seat ${s}`);
         }
       }
-    } else if (layout_type === 'rows') {
+    } else if (number_of_rows && seats_per_row) {
       for (let r = 1; r <= number_of_rows; r++) {
         for (let s = 1; s <= seats_per_row; s++) {
-          allPossibleSeats.push(`Row ${r} - Seat ${s}`);
+          allSeats.push(`Row ${r} - Seat ${s}`);
         }
       }
     } else {
-      return res.status(400).json({ error: 'Invalid layout type. Must be either "table" or "rows"' });
+      return res.status(400).json({ error: 'Invalid seating configuration' });
     }
 
-    // Fetch already assigned seats
+    // Fetch used seats
     const usedSeatsResult = await db.query(
       'SELECT seat_number FROM guests WHERE event_id = $1 AND seat_number IS NOT NULL',
       [eventId]
     );
     const usedSeats = new Set(usedSeatsResult.rows.map(row => row.seat_number));
 
-    // Remove already used seats from the list
-    const availableSeats = allPossibleSeats.filter(seat => !usedSeats.has(seat));
-    const updatedGuests = [];
+    const availableSeats = allSeats.filter(seat => !usedSeats.has(seat));
 
-    for (let i = 0; i < guestsWithoutSeats.rows.length; i++) {
-      const guest = guestsWithoutSeats.rows[i];
-      if (availableSeats.length === 0) break;
+    // Fetch guests without seats
+    const unseatedGuests = await db.query(
+      'SELECT guest_id FROM guests WHERE event_id = $1 AND seat_number IS NULL',
+      [eventId]
+    );
 
+    const updated = [];
+
+    for (let i = 0; i < unseatedGuests.rows.length && availableSeats.length > 0; i++) {
+      const guestId = unseatedGuests.rows[i].guest_id;
       const seat = availableSeats.shift();
 
-      // Double-check for conflicts in DB
-      const conflictCheck = await db.query(
-        'SELECT guest_id FROM guests WHERE event_id = $1 AND seat_number = $2',
-        [eventId, seat]
+      await db.query(
+        'UPDATE guests SET seat_number = $1 WHERE guest_id = $2 AND event_id = $3',
+        [seat, guestId, eventId]
       );
-      if (conflictCheck.rows.length === 0) {
-        await db.query(
-          'UPDATE guests SET seat_number = $1 WHERE guest_id = $2 AND event_id = $3',
-          [seat, guest.guest_id, eventId]
-        );
-        updatedGuests.push({ guest_id: guest.guest_id, seat });
-      } else {
-        console.warn(`Seat ${seat} already taken — skipping.`);
-      }
+
+      updated.push({ guest_id: guestId, seat });
     }
 
-    const notSeated = guestsWithoutSeats.rows.length - updatedGuests.length;
+    const notSeated = unseatedGuests.rows.length - updated.length;
 
-    return res.status(200).json({
-      message: 'Seats auto-assigned successfully.',
-      total_guests_assigned: updatedGuests.length,
-      guests_not_assigned: notSeated,
-      assigned: updatedGuests
+    res.status(200).json({
+      message: 'Auto-assignment complete',
+      assigned: updated.length,
+      unassigned: notSeated,
+      guests: updated
     });
 
   } catch (err) {
-    console.error('Error auto-assigning seats:', err);
+    console.error('Auto-assign error:', err);
     res.status(500).json({ error: 'Failed to auto-assign seats' });
   }
 });
+
 
 //Route to send final email with QR code and assigned seats
 app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrganizer, async (req,res) => {
