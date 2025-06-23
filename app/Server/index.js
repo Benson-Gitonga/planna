@@ -1203,6 +1203,66 @@ app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrgani
   }
 });
 
+// Route to update check-in status when QR code is scanned
+app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async (req, res) => {
+  const { qr_code } = req.body;
+  const organizerId = req.session.user.id;
+
+  if (!qr_code) {
+    return res.status(400).json({ error: 'QR code is required' });
+  }
+
+  try {
+    // Retrieve guest and associated event
+    const result = await db.query(`
+      SELECT g.guest_id, g.check_in_status, e.organizer_id, e.event_date, e.end_time
+      FROM guests g
+      JOIN events e ON g.event_id = e.event_id
+      WHERE g.qr_code = $1
+    `, [qr_code]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Guest with provided QR code not found' });
+    }
+
+    const guest = result.rows[0];
+
+    // Ensure the guest belongs to an event of this organizer
+    if (guest.organizer_id !== organizerId) {
+      return res.status(403).json({ error: 'Unauthorized: This guest is not from your event' });
+    }
+
+    // Check if already checked in
+    if (guest.check_in_status === true) {
+      return res.status(200).json({ message: 'Guest already checked in' });
+    }
+
+    // Construct event end datetime
+    const eventEnd = new Date(`${guest.event_date.toISOString().split('T')[0]}T${guest.end_time}`);
+
+    // Compare with current time
+    const now = new Date();
+    if (now > eventEnd) {
+      return res.status(403).json({ error: 'Check-in not allowed after the event has ended' });
+    }
+
+    // Update check-in status
+    await db.query(`
+      UPDATE guests
+      SET check_in_status = TRUE
+      WHERE qr_code = $1
+    `, [qr_code]);
+
+    res.status(200).json({ message: 'Guest checked in successfully' });
+
+  } catch (err) {
+    console.error('Check-in error:', err);
+    res.status(500).json({ error: 'Failed to check in guest' });
+  }
+});
+
+
+
 
     
 //Administrator routes
