@@ -71,7 +71,7 @@ export default function CreateEvent() {
       setEventLocation('');
       setStartTime('');
       setEndTime('');
-      setTimeout(() => router.push('/events'), 1500);
+      setTimeout(() => router.push('/organizer'), 1500);
 
     } catch (err) {
       setError(err.message);
