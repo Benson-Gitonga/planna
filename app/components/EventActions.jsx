@@ -225,17 +225,6 @@ export default function EventsTable() {
                     </Button>
                   </OverlayTrigger>
 
-                  <OverlayTrigger placement="top" overlay={<Tooltip>Final Email with QR Code</Tooltip>}>
-                    <Button
-                      variant={finalEmailSentEvents.includes(event.event_id) ? 'success' : 'outline-danger'}
-                      size="sm"
-                      onClick={() => handleSendFinalEmail(event.event_id, event.event_name)}
-                      disabled={sendingFinalEventId === event.event_id || finalEmailSentEvents.includes(event.event_id)}
-                    >
-                      <FaPaperPlane className="me-1" />
-                      {finalEmailSentEvents.includes(event.event_id) ? 'Final Sent' : 'Final Email'}
-                    </Button>
-                  </OverlayTrigger>
 
                   <OverlayTrigger placement="top" overlay={<Tooltip>View Guest List</Tooltip>}>
                     <Link href={`/organizer/guest-list/${event.event_id}`} passHref>
@@ -265,6 +254,20 @@ export default function EventsTable() {
                       </Button>
                     </Link>
                   </OverlayTrigger>
+
+                  
+                  <OverlayTrigger placement="top" overlay={<Tooltip>Final Email with QR Code</Tooltip>}>
+                    <Button
+                      variant={finalEmailSentEvents.includes(event.event_id) ? 'success' : 'outline-danger'}
+                      size="sm"
+                      onClick={() => handleSendFinalEmail(event.event_id, event.event_name)}
+                      disabled={sendingFinalEventId === event.event_id || finalEmailSentEvents.includes(event.event_id)}
+                    >
+                      <FaPaperPlane className="me-1" />
+                      {finalEmailSentEvents.includes(event.event_id) ? 'Final Sent' : 'Final Email'}
+                    </Button>
+                  </OverlayTrigger>
+                  
                 </div>
               </td>
             </tr>

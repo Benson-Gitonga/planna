@@ -1120,62 +1120,88 @@ app.post('/api/seating/:eventId/auto-assign', requireLogin, requireOrganizer, as
 
 
 //Route to send final email with QR code and assigned seats
-app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrganizer, async (req,res) => {
-    const eventId = req.params.eventId;
-    const organizerId = req.session.user.id;
-    try{
-        //Check if the event exists and belongs to the current organizer
-        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
-        if(eventCheck.rows.length === 0){
-            //If the event does not exist or does not belong to the organizer, return an error
-            return res.status(403).json({
-                error: 'Unauthorized to send final email for this event'
-            })
-        }
-        //Get the event details
-        const event = eventCheck.rows[0];
+app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+  const eventId = req.params.eventId;
+  const organizerId = req.session.user.id;
 
-        //Obtain guests who accepted RSVP and have seat + QR code
-        const guestRes = await db.query(`
-            SELECT first_name, last_name, email_address, seat_number, qr_code            
-            FROM guests
-            WHERE event_id = $1 AND rsvp_status = $2 AND seat_number IS NOT NULL AND qr_code IS NOT NULL
-            `, [eventId, 'accepted']);
-            if(guestRes.rows.length === 0){
-                return res.status(404).json({
-                    message: 'No guests found with accepted RSVP and assigned seats'
-                })
-            }
-            //Send emails
-            for(const guest of guestRes.rows){
-                const mailOptions = {
-                from: `"${event.organizer_name} via Planna" <${process.env.EMAIL_ADDRESS}>`,
-                to: guest.email_address,
-                subject: `Final Invite: ${event.event_name}`,
-                html: `
-                    <p>Dear ${guest.first_name},</p>
-                    <p>This is your final event confirmation for <strong>${event.event_name}</strong>.</p>
-                    <p><strong>Event Date:</strong> ${event.event_date}</p>
-                    <p><strong>Location:</strong> ${event.location}</p>
-                    <p><strong>Seat:</strong> ${guest.seat_number}</p>
-                    <p><img src="${guest.qr_code}" alt="QR Code" width="150"/></p>
-                    <p>Kindly present this QR code at the entrance for check-in.</p>
-                    <p>Regards,<br>${event.organizer_name || 'Event Organizer'}</p>
-                `                      
-                };
-                await transporter.sendMail(mailOptions);
-            }
-            res.status(200).json({
-                message: 'Final emails sent successfully to all guests with assigned seats',
-                total_emails_sent: guestRes.rows.length
-            });
-        }catch(err){
-            console.error('Error sending final emails:', err);
-            res.status(500).json({
-                error: 'Failed to send final emails'
-            })
+  try {
+    // Check if event exists and belongs to organizer
+    const eventCheck = await db.query(
+      'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Unauthorized to send final email for this event' });
     }
-}) 
+
+    const event = eventCheck.rows[0];
+
+    // Get guests with accepted RSVP and valid seat & QR code
+    const guestRes = await db.query(
+      `SELECT first_name, last_name, email_address, seat_number, qr_code
+       FROM guests
+       WHERE event_id = $1 AND rsvp_status = $2 AND seat_number IS NOT NULL AND qr_code IS NOT NULL`,
+      [eventId, 'accepted']
+    );
+
+    if (guestRes.rows.length === 0) {
+      return res.status(404).json({ message: 'No guests found with accepted RSVP and assigned seats' });
+    }
+
+    // Configure mail transporter
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,         // should match sender email
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    // Loop through guests and send emails
+    for (const guest of guestRes.rows) {
+      const base64Image = guest.qr_code.replace(/^data:image\/png;base64,/, '');
+      const qrBuffer = Buffer.from(base64Image, 'base64');
+
+      const mailOptions = {
+        from: `"${event.organizer_name || 'Event Organizer'} via Planna" <${process.env.EMAIL_USER}>`,
+        to: guest.email_address,
+        subject: `Final Invite: ${event.event_name}`,
+        html: `
+          <p>Dear ${guest.first_name},</p>
+          <p>This is your final event confirmation for <strong>${event.event_name}</strong>.</p>
+          <p><strong>Event Date:</strong> ${new Date(event.event_date).toLocaleString('en-KE', {
+            timeZone: 'Africa/Nairobi',
+            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          })}</p>
+          <p><strong>Location:</strong> ${event.location}</p>
+          <p><strong>Seat:</strong> ${guest.seat_number}</p>
+          <p><img src="cid:qrcode_${guest.email_address}" alt="QR Code" width="150"/></p>
+          <p>Kindly present this QR code at the entrance for check-in.</p>
+          <p>Regards,<br>${event.organizer_name || 'Event Organizer'}</p>
+        `,
+        attachments: [
+          {
+            filename: 'qrcode.png',
+            content: qrBuffer,
+            cid: `qrcode_${guest.email_address}` // Must match img src cid
+          }
+        ]
+      };
+
+      await transporter.sendMail(mailOptions);
+    }
+
+    res.status(200).json({
+      message: 'Final emails sent successfully to all guests with assigned seats',
+      total_emails_sent: guestRes.rows.length
+    });
+
+  } catch (err) {
+    console.error('Error sending final emails:', err);
+    res.status(500).json({ error: 'Failed to send final emails' });
+  }
+});
 
 
     
