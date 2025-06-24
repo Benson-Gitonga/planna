@@ -9,7 +9,6 @@ const actions = [
   { label: 'Create Event', icon: 'bi-calendar-plus', link: '/organizer/event' },
   { label: 'View Events', icon: 'bi-list-ul', link: '/organizer/myevents' },
   { label: 'Manage Events', icon: 'bi-person-check', link: '/organizer/manage-events' },
-  { label: 'Seating Arrangement', icon: 'bi-grid-3x3-gap', link: '/organizer/seating' },
   { label: 'Check-in', icon: 'bi-clipboard-check', link: '/organizer/check-in' },
 ];
 
