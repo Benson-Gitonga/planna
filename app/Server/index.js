@@ -24,7 +24,7 @@ app.use(session({
     resave: false,
     saveUninitialized: true,
     cookie: {
-        maxAge: 100* 60 * 60, //1 hour
+        maxAge: 100* 60 * 1000, //Session will expire after one hour 
         secure: false
     }
 }));
@@ -1439,6 +1439,92 @@ app.delete('/api/admin/delete-organizer/:organizerId', requireLogin, requireAdmi
         console.error('Error deleting organizer:', err);
         res.status(500).json({
             error: 'Failed to delete organizer'
+        })
+    }
+});
+
+//Route to allow a guest to event information based on their access code
+app.get('/api/guest/event-info/:accessCode', async (req,res) => {
+    const accessCode = req.params.accessCode;
+    try{
+        const result = await db.query(`
+            SELECT e.event_id, e.event_name, e.event_date, e.location, e.start_time, e.end_time,
+            g.first_name, g.last_name, g.rsvp_status, g.seat_number, g.check_in_status
+            FROM guests g
+            JOIN events e ON g.event_id = e.event_id
+            WHERE g.access_code = $1            
+            `, [accessCode]);
+            if(result.rows.length === 0){
+                return res.status(404).json({
+                    error: 'Access code not found or invalid'
+                })
+            }
+            return res.status(200).json({
+                eventDetails: result.rows[0]
+            });
+    }catch(err){
+        console.error('Error retrieving event by access code:', err);
+        return res.status(500).json({
+            error: 'Server error retrieving event details'
+        })
+    }
+});
+
+//Route to allow guest to cancel their RSVP
+app.post('/api/guest/cancel-rsvp', async (req,res) => {
+    const {access_code} = req.body;
+    if(!access_code){
+        return res.status(400).json({
+            error: 'Access code required'
+        });
+    }
+    try{
+        const result = await db.query(`
+            SELECT g.guest_id, g.email_address, g.first_name, g.last_name, e.event_name, 
+            FROM guest g
+            JOIN events e ON g.event_id = e.event_id
+            WHERE g.access_code = $1            
+            `, [access_code]);
+            if(result.rows.length === 0){
+                return res.status(404).json({
+                    error: 'Invalid access code'
+                });
+            }
+            const guest = result.rows[0];
+            //Update RSVP status
+            await db.query(`
+                UPDATE guests SET rsvp_status = 'declined' WHERE access_code = $1                
+                `, [access_code]);
+            //Send cancellation email
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth:{
+                    user: process.env.EMAIL_USER,
+                    pass: process.env.EMAIL_PASSWORD
+                }
+            });
+            const mailOptions = {
+                from: `"Planna" <${process.env.EMAIL_USER}>`,
+                to: guest.email_address,
+                subject: `RSVP Cancellation for ${guest.event_name}`,
+                html: `
+                    <p>Dear ${guest.first_name},</p>
+                    <p>We have received your request to cancel your RSVP for the event <strong>${guest.event_name}</strong>.</p>
+                    <p>Your RSVP has been successfully cancelled.</p>
+                    <p>Thank you for letting us know!</p>
+                    <p>Best regards,<br>Planna Team</p>                     
+                `
+            };
+            await transporter.sendMail(mailOptions);
+            res.status(200).json({
+                message: ''
+            })
+
+
+    }catch(err){
+        console.error('RSVP cancellation error:', err);
+        res.status(500).json({
+            error: 'Failed to cancel RSVP'
         })
     }
 });
