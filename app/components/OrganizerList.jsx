@@ -9,6 +9,7 @@ import {
   Alert,
   Button,
   InputGroup,
+  Badge,
 } from 'react-bootstrap';
 import { FaSearch, FaUserTie } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
@@ -19,7 +20,7 @@ export default function OrganizerList() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [deletingId, setDeletingId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -78,31 +79,49 @@ export default function OrganizerList() {
     setFilteredOrganizers(filtered);
   }, [search, organizers]);
 
-  const handleDelete = async (organizerId) => {
-    const confirmDelete = confirm('Are you sure you want to delete this organizer?');
-    if (!confirmDelete) return;
+  const toggleStatus = async (organizerId, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'deactivated' : 'active';
+    const confirmToggle = confirm(
+      `Are you sure you want to ${newStatus === 'active' ? 'activate' : 'deactivate'} this account?`
+    );
+    if (!confirmToggle) return;
 
     try {
-      setDeletingId(organizerId);
+      setTogglingId(organizerId);
 
-      const res = await fetch(`http://localhost:5000/api/admin/delete-organizer/${organizerId}`, {
-        method: 'DELETE',
+      const res = await fetch(`http://localhost:5000/api/admin/toggle-status/${organizerId}`, {
+        method: 'PATCH',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
       });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data?.error || 'Failed to delete organizer');
+      if (!res.ok) throw new Error(data?.error || 'Failed to update status');
 
-      // Remove organizer from the UI
-      const updated = organizers.filter(org => org.user_id !== organizerId);
-      setOrganizers(updated);
-      setFilteredOrganizers(updated);
+      // Update UI
+      const updatedOrganizers = organizers.map(org =>
+        org.user_id === organizerId ? { ...org, status: newStatus } : org
+      );
+      setOrganizers(updatedOrganizers);
+      setFilteredOrganizers(updatedOrganizers);
     } catch (err) {
-      console.error('Delete error:', err);
-      alert('Failed to delete organizer.');
+      console.error('Status toggle error:', err);
+      alert('Failed to update status.');
     } finally {
-      setDeletingId(null);
+      setTogglingId(null);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'active':
+        return <Badge bg="success">Active</Badge>;
+      case 'deactivated':
+        return <Badge bg="danger">Deactivated</Badge>;
+      default:
+        return <Badge bg="secondary">Unknown</Badge>;
     }
   };
 
@@ -139,7 +158,8 @@ export default function OrganizerList() {
                 <th>#</th>
                 <th>Organizer Name</th>
                 <th>Email Address</th>
-                <th>Actions</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -148,14 +168,19 @@ export default function OrganizerList() {
                   <td>{index + 1}</td>
                   <td>{org.first_name} {org.last_name}</td>
                   <td>{org.email}</td>
+                  <td>{getStatusBadge(org.status)}</td>
                   <td>
                     <Button
-                      variant="danger"
+                      variant={org.status === 'active' ? 'outline-danger' : 'outline-success'}
                       size="sm"
-                      disabled={deletingId === org.user_id}
-                      onClick={() => handleDelete(org.user_id)}
+                      disabled={togglingId === org.user_id}
+                      onClick={() => toggleStatus(org.user_id, org.status)}
                     >
-                      {deletingId === org.user_id ? 'Deleting...' : 'Delete'}
+                      {togglingId === org.user_id
+                        ? 'Updating...'
+                        : org.status === 'active'
+                        ? 'Deactivate'
+                        : 'Activate'}
                     </Button>
                   </td>
                 </tr>

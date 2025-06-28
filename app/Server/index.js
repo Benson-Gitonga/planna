@@ -127,65 +127,72 @@ app.post('/api/register', async (req,res) => {
     }
 });
 
-//Post request to login a user into the system
-app.post('/api/login', async (req,res) => {
-    //Extracting the email and password from the request body
-    const {email, password} = req.body;
-    //Validation to ensure that email and password are provided
-    if(!req.body || !email || !password){
-        //If email or password are not present in the request body, return an error
-        return res.status(400).json({
-            error: 'Email and password are required'
-        })
+// Post request to login a user into the system
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!req.body || !email || !password) {
+    return res.status(400).json({
+      error: 'Email and password are required'
+    });
+  }
+
+  try {
+    const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'User with provided email does not exist'
+      });
     }
-    try{
-        //Querying the database to find the user with the provided email address
-        const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-        if(userResult.rows.length > 0){
-            const user = userResult.rows[0];
-            //Comparing the provided password with the hashed password stored in the database
-            const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-            if(isPasswordValid){
-                //If password is valid, create a session for the user
-                req.session.user = {
-                    id: user.user_id,
-                    firstName: user.first_name,
-                    lastName: user.last_name,
-                    email: user.email,
-                    role: user.role
-                }
-                console.log('User logged in:', user);
-                //Sending a success response with user details
-                return res.status(200).json({
-                    message: 'Login successful',
-                    // User details excluding password
-                    user: {
-                        id: user.user_id,
-                        firstName: user.first_name,
-                        lastName: user.last_name,
-                        email: user.email,
-                        role: user.role
-                    }   
-                })
-            } else {
-                //If password is invalid, return error
-                return res.status(401).json({
-                    error: 'Invalid password'
-                })
-            }  
-        }else{
-            //If no user is found with the provided email, return error
-            return res.status(404).json({
-                error: 'User with provided email does not exist'
-            })
-        }
-    } catch (error) {
-        console.error('Error logging in user:', error);
-        res.status(500).json({
-            error: 'Failed to login user'
-        })
+
+    const user = userResult.rows[0];
+
+    // Check if the account is deactivated
+    if (user.status === 'deactivated') {
+      return res.status(403).json({
+        error: 'Your account has been deactivated by the admin. Please contact support for assistance.'
+      });
     }
-})
+
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        error: 'Invalid password'
+      });
+    }
+
+    // Create session for valid and active user
+    req.session.user = {
+      id: user.user_id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      role: user.role
+    };
+
+    console.log('User logged in:', user);
+
+    return res.status(200).json({
+      message: 'Login successful',
+      user: {
+        id: user.user_id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Error logging in user:', error);
+    res.status(500).json({
+      error: 'Failed to login user'
+    });
+  }
+});
+
 //Route to verify the session of a user
 app.get('/api/me', (req,res) => {
     if(!req.session.user){
@@ -1359,7 +1366,7 @@ app.get('/api/admin/most-active-organizers', requireLogin, requireAdmin, async (
 //Route to get all the organizers in the application
 app.get('/api/admin/all-organizers', requireLogin, requireAdmin, async (req,res) => {
     try{
-        const result = await db.query('SELECT user_id, first_name, last_name, email FROM users WHERE role = $1', ['organizer']);
+        const result = await db.query('SELECT user_id, first_name, last_name, email, status FROM users WHERE role = $1', ['organizer']);
         if(result.rows.length === 0){
             return res.status(404).json({
                 message: 'No organizers found'
@@ -1419,29 +1426,22 @@ app.get('/api/admin/upcoming-events', requireLogin, requireAdmin, async (req,res
     }
 });
 
-//Route to delete an organizer
-app.delete('/api/admin/delete-organizer/:organizerId', requireLogin, requireAdmin, async (req,res) => {
-    const organizerId = req.params.organizerId;
-    try{
-        //Check if the organizer exists
-        const organizerCheck = await db.query('SELECT * FROM users WHERE user_id = $1 AND role = $2', [organizerId, 'organizer']);
-        if(organizerCheck.rows.length === 0){
-            return res.status(404).json({
-                error: 'Organizer not found'
-            })
-        }
-        //Delete the organizer from the database
-        await db.query('DELETE FROM users WHERE user_id = $1 AND role = $2', [organizerId, 'organizer']);
-        res.status(200).json({
-            message: 'Organizer deleted successfully'
-        })
-    }catch(err){
-        console.error('Error deleting organizer:', err);
-        res.status(500).json({
-            error: 'Failed to delete organizer'
-        })
-    }
+app.patch('/api/admin/toggle-status/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    await db.query(
+      'UPDATE users SET status = $1 WHERE user_id = $2 AND role = $3',
+      [status, id, 'organizer']
+    );
+    res.status(200).json({ message: `Status updated to ${status}` });
+  } catch (err) {
+    console.error('Status update failed:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
+
 
 //Route to allow a guest to event information based on their access code
 app.get('/api/guest/event-info/:accessCode', async (req,res) => {
