@@ -199,7 +199,7 @@ export default function EventsTable() {
             <tr key={event.event_id}>
               <td>{index + 1}</td>
               <td>{event.event_name}</td>
-              <td>{event.event_date}</td>
+              <td>{new Date(event.event_date).toLocaleDateString('en-GB')}</td>
               <td>{event.location}</td>
               <td>{event.start_time} - {event.end_time}</td>
               <td>

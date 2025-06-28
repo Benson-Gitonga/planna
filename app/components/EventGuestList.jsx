@@ -35,7 +35,7 @@ export default function EventGuestList({ params }) {
         credentials: 'include',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch guest list');
+      if (!res.ok) throw new Error(data.error || 'No guests have been added yet');
       setGuests(data.guests || []);
     } catch (err) {
       setError(err.message);
@@ -110,7 +110,7 @@ export default function EventGuestList({ params }) {
   return (
     <Container className="py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h5 className="mb-0">Event Guest List</h5>
+        <h5 className="mb-0">Guest List for Event</h5>
         <Button onClick={() => setShowModal(true)}>Add Guest</Button>
       </div>
 
