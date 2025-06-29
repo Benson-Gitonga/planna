@@ -10,6 +10,7 @@ const actions = [
   { label: 'View Events', icon: 'bi-list-ul', link: '/organizer/myevents' },
   { label: 'Manage Events', icon: 'bi-person-check', link: '/organizer/manage-events' },
   { label: 'Check-in', icon: 'bi-clipboard-check', link: '/organizer/check-in' },
+  { label: 'Event Analytics', icon: 'bi-graph-up', link: '/organizer/analytics' },
 ];
 
 const sidebarStyle = (open) => ({
