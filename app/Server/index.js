@@ -131,6 +131,8 @@ app.post('/api/register', async (req,res) => {
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
+  const emailLower = email.toLowerCase();
+
   if (!req.body || !email || !password) {
     return res.status(400).json({
       error: 'Email and password are required'
@@ -138,7 +140,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const userResult = await db.query('SELECT * FROM users WHERE LOWER(email) = $1', [emailLower]);
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({
