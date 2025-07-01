@@ -10,14 +10,15 @@ import {
   Alert,
   Spinner,
   Card,
-  ProgressBar,
+  Toast,
+  ToastContainer
 } from 'react-bootstrap';
 import { useRouter } from 'next/navigation';
 import {
   FaCalendarAlt,
   FaClock,
   FaMapMarkerAlt,
-  FaRegFlag,
+  FaRegFlag
 } from 'react-icons/fa';
 
 export default function CreateEvent() {
@@ -30,33 +31,17 @@ export default function CreateEvent() {
   const [loading, setLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [progress, setProgress] = useState(100);
-  const [showProgress, setShowProgress] = useState(false);
-
   const router = useRouter();
 
   useEffect(() => {
     if (showToast) {
-      const toastTimer = setTimeout(() => setShowToast(false), 2500);
-      return () => clearTimeout(toastTimer);
+      const timer = setTimeout(() => {
+        setShowToast(false);
+        router.push('/organizer');
+      }, 4000); // toast stays 4 seconds
+      return () => clearTimeout(timer);
     }
-  }, [showToast]);
-
-  useEffect(() => {
-    if (showProgress) {
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev <= 0) {
-            clearInterval(interval);
-            router.push('/organizer');
-            return 0;
-          }
-          return prev - 10;
-        });
-      }, 150);
-      return () => clearInterval(interval);
-    }
-  }, [showProgress, router]);
+  }, [showToast, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,8 +74,8 @@ export default function CreateEvent() {
           eventDate,
           eventLocation,
           startTime,
-          endTime,
-        }),
+          endTime
+        })
       });
 
       const data = await response.json();
@@ -98,9 +83,8 @@ export default function CreateEvent() {
 
       setToastMessage('🎉 Event created successfully!');
       setShowToast(true);
-      setShowProgress(true);
-      setProgress(100);
 
+      // Clear the form
       setEventName('');
       setEventDate('');
       setEventLocation('');
@@ -115,52 +99,24 @@ export default function CreateEvent() {
 
   return (
     <>
-      {/* Top-Right Toast Notification */}
-      {showToast && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            zIndex: 1050,
-            minWidth: '280px',
-          }}
+      {/* Success Toast Notification */}
+      <ToastContainer position="top-end" className="p-3" style={{ zIndex: 1050 }}>
+        <Toast
+          show={showToast}
+          onClose={() => setShowToast(false)}
+          delay={4000}
+          autohide
+          bg="success"
         >
-          <div
-            className="toast show bg-success text-white"
-            role="alert"
-            aria-live="assertive"
-            aria-atomic="true"
-          >
-            <div className="d-flex">
-              <div className="toast-body">{toastMessage}</div>
-              <button
-                type="button"
-                className="btn-close btn-close-white me-2 m-auto"
-                aria-label="Close"
-                onClick={() => setShowToast(false)}
-              ></button>
-            </div>
-          </div>
-        </div>
-      )}
+          <Toast.Header closeButton={false}>
+            <strong className="me-auto">Success</strong>
+            <small>Just now</small>
+          </Toast.Header>
+          <Toast.Body className="text-white">{toastMessage}</Toast.Body>
+        </Toast>
+      </ToastContainer>
 
-      {/* Top-right Progress Bar */}
-      {showProgress && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '0',
-            right: '0',
-            left: '0',
-            zIndex: 1040,
-          }}
-        >
-          <ProgressBar now={progress} variant="success" striped animated />
-        </div>
-      )}
-
-      <Container className="py-4">
+      <Container className="py-1">
         <Row className="justify-content-center">
           <Col md={8} lg={6} xl={5}>
             <Card className="shadow-lg border-0">
