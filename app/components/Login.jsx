@@ -30,7 +30,7 @@ export default function Login() {
 
       if (!response.ok) throw new Error(data.error || 'Login failed');
 
-      // ✅ Role-based redirection
+      //  Role-based redirection
       switch (data.user.role.toLowerCase()) {
         case 'admin':
           router.push('/admin');
@@ -76,6 +76,7 @@ export default function Login() {
                 type="email"
                 required
                 value={email}
+                disabled={loading}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
               />
@@ -87,6 +88,7 @@ export default function Login() {
                 type="password"
                 required
                 value={password}
+                disabled={loading}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
               />

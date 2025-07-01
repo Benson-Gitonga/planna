@@ -227,41 +227,49 @@ app.get('/api/logout', (req,res) => {
 
 //Route to create a new event
 app.post('/api/events', requireLogin, requireOrganizer, async (req,res) => {
-    const {eventName, eventDate, eventLocation, startTime, endTime} = req.body;
-    const organizer_id = req.session.user.id;
-    if(!req.body || !eventName || !eventDate || !eventLocation || !startTime || !endTime){
-        //If any field is missing, return an error
-        return res.status(400).json({
-            error: 'All fields are required'
-        })
-    }
-    //Validate the event date to ensure it is in the future
-    const currentDate = new Date();
-    currentDate.setHours(0,0,0,0);
-    const inputDate = new Date(eventDate);
-    if(inputDate < currentDate){
-        //If the event date is in the past, return an error
-        return res.status(400).json({
-            error: 'Event date cannot be in the past'
-        })
-    }
-    
-    try{
-        //console.log("Session data in /api/events:", req.session);
-        //console.log("User in session:", req.session.user);
-        const event = await db.query('INSERT INTO events (organizer_id, event_name, event_date, location, start_time, end_time) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [organizer_id, eventName, eventDate, eventLocation, startTime, endTime]);
-        console.log('New event created:', event.rows[0]);
-        return res.status(201).json({
-            message: 'Event created successfully',
-            event: event.rows[0]
-        });
-    }catch(err){
-        console.error('Error creating the event:', err);
-        return res.status(500).json({
-            error: 'Failed to create event'
-        })
-    }
-})
+  const { eventName, eventDate, eventLocation, startTime, endTime } = req.body;
+  const organizer_id = req.session.user.id;
+
+  if (!eventName || !eventDate || !eventLocation || !startTime || !endTime) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  // Validate event date is not in the past
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eventDay = new Date(eventDate);
+  if (eventDay < today) {
+    return res.status(400).json({ error: 'Event date cannot be in the past' });
+  }
+
+  // Validate time logic (handle overnight events)
+  const startDateTime = new Date(`${eventDate}T${startTime}`);
+  let endDateTime = new Date(`${eventDate}T${endTime}`);
+  if (endDateTime <= startDateTime) {
+    // If end time is before or equal to start time, assume it passes midnight
+    endDateTime.setDate(endDateTime.getDate() + 1);
+  }
+
+  try {
+    const result = await db.query(
+      `INSERT INTO events (organizer_id, event_name, event_date, location, start_time, end_time)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [organizer_id, eventName, eventDate, eventLocation, startTime, endTime]
+    );
+
+    console.log('New event created:', result.rows[0]);
+
+    return res.status(201).json({
+      message: 'Event created successfully',
+      event: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error('Error creating the event:', err);
+    return res.status(500).json({ error: 'Failed to create event' });
+  }
+});
+
 
 //Route to handle CSV file uploads by organizers
 app.post('/api/upload-csv/:eventId', requireLogin, requireOrganizer, upload.single('file'), async (req,res) => {
