@@ -10,6 +10,7 @@ import cors from "cors";
 import {PassThrough} from "stream";
 import {v4 as uuidv4} from 'uuid';
 import QRCode from 'qrcode';
+
 env.config();
 
 const app = express();
@@ -1276,7 +1277,152 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
     console.error('Check-in error:', err);
     res.status(500).json({ error: 'Failed to check in guest' });
   }
-});    
+}); 
+//Organizer analytics routes
+
+//Route to obtain the total events created by an organizer
+app.get('/api/organizer/total-events', requireLogin, requireOrganizer, async (req,res) => {
+    const organizerId = req.session.user.id;
+    try{
+        const eventCountResult = await db.query('SELECT COUNT (*) FROM events WHERE organizer_id = $1', [organizerId]);
+        res.status(200).json({
+            total_events: parseInt(eventCountResult.rows[0].count)
+        });
+
+    }catch(err){
+        console.error('Error retrieving total events:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve total events'
+        });
+    }
+});
+
+//Route to obtain the upcoming events for an organizer
+app.get('/api/organizer/upcoming-events', requireLogin, requireOrganizer, async (req,res) => {
+    const organizerId = req.session.user.id;
+    try{
+        const upcomingEventsResult = await db.query(`
+            SELECT event_id, event_name, event_date, location, start_time, end_time
+            FROM events
+            WHERE organizer_id = $1 AND event_date > NOW()
+            ORDER BY event_date ASC
+        `, [organizerId]);
+
+        if(upcomingEventsResult.rows.length === 0){
+            return res.status(404).json({
+                message: 'No upcoming events found'
+            });
+        }
+        res.status(200).json({
+            upcoming_events: upcomingEventsResult.rows
+        });   
+    }catch(err){
+        console.error('Error retrieving upcoming events:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve upcoming events'
+        });
+    }
+});
+
+//Route to view the attendance rate per event
+app.get('/api/organizer/attendance-rate', requireLogin, requireOrganizer, async (req,res) => {
+    const organizerId = req.session.user.id;
+    try{
+        const attendanceRateResult = await db.query(`
+            SELECT e.event_id, e.event_name, e.event_date, 
+            COUNT(g.guest_id) AS total_guests,
+            COUNT(CASE WHEN g.rsvp_status = 'accepted' THEN 1 END) AS accepted_guests,
+            COUNT(CASE WHEN g.check_in_status = TRUE THEN 1 END) AS checked_in
+            FROM events e
+            LEFT JOIN guests g ON e.event_id = g.event_id
+            WHERE e.organizer_id = $1
+            GROUP BY e.event_id, e.event_name, e.event_date
+            ORDER BY e.event_date ASC
+            `, [organizerId]);
+        if(attendanceRateResult.rows.length === 0){
+            return res.status(404).json({
+                message: 'No attendance data found for your events'
+            });
+        }
+        const attendanceData = attendanceRateResult.rows.map(event => {
+            const totalGuests = parseInt(event.total_guests);
+            const acceptedGuests = parseInt(event.accepted_guests);
+            const checkedIn = parseInt(event.checked_in);
+            const attendanceRate = totalGuests > 0 ? (checkedIn / totalGuests) * 100 : 0;
+
+            return {
+                event_id: event.event_id,
+                event_name: event.event_name,
+                event_date: event.event_date,
+                total_guests: totalGuests,
+                accepted_guests: acceptedGuests,
+                checked_in: checkedIn,
+                attendance_rate: attendanceRate.toFixed(2) + '%'
+            };
+        });
+        res.status(200).json({
+            attendance_rate_per_event: attendanceData
+        });   
+    }catch(err){
+        console.error('Error retrieving attendance rate:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve attendance rate'
+        });
+    }
+});
+
+//Route to view the most popular events based on RSVPs
+app.get('/api/organizer/popular-events', requireLogin, requireOrganizer, async (req,res) => {
+    const organizerId = req.session.user.id;
+    try{
+        const popularEventsResult = await db.query(`
+            SELECT e.event_id, e.event_name, e.event_date,
+            COUNT(g.guest_id) AS total_rsvps,
+            COUNT(CASE WHEN g.rsvp_status = 'accepted' THEN 1 END) AS accepted_rsvps,
+            COUNT(CASE WHEN g.rsvp_status = 'declined' THEN 1 END) AS declined_rsvps
+            FROM events e
+            LEFT JOIN guests g ON e.event_id = g.event_id
+            WHERE e.organizer_id = $1
+            GROUP BY e.event_id, e.event_name, e.event_date
+            ORDER BY total_rsvps DESC
+            LIMIT 10
+        `, [organizerId]);
+        if(popularEventsResult.rows.length === 0){
+            return res.status(404).json({
+                message: 'No popular events found for your account'
+            });
+        }
+        res.status(200).json({
+            popular_events: popularEventsResult.rows
+        });
+    }catch(err){
+        console.error('Error retrieving popular events:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve popular events'
+        });
+    }
+});
+
+//Route to get total guests invited across all the organizers events from csv_uplaods
+app.get('/api/organizer/total-guests', requireLogin, requireOrganizer, async (req,res) => {
+    const organizerId = req.session.user.id;
+    try{
+        const totalGuestsResult = await db.query(`
+            SELECT COUNT(*) AS total_guests
+            FROM csv_uploads
+            WHERE uploader_id = $1
+            `, [organizerId]);
+            res.status(200).json({
+                total_guests: parseInt(totalGuestsResult.rows[0].total_guests)
+            });
+    }catch(err){
+        console.error('Error retrieving total guests:', err);
+        res.status(500).json({
+            error: 'Failed to retrieve total guests'
+        })
+    }
+});
+
 //Administrator routes
 
 //Route to get the total event count in the application
@@ -1490,7 +1636,7 @@ app.post('/api/guest/cancel-rsvp', async (req,res) => {
     }
     try{
         const result = await db.query(`
-            SELECT g.guest_id, g.email_address, g.first_name, g.last_name, e.event_name, 
+            SELECT g.guest_id, g.email_address, g.first_name, g.last_name, e.event_name
             FROM guest g
             JOIN events e ON g.event_id = e.event_id
             WHERE g.access_code = $1            

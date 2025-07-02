@@ -11,6 +11,7 @@ const actions = [
   { label: 'Manage Events', icon: 'bi-person-check', link: '/organizer/manage-events' },
   { label: 'Check-in', icon: 'bi-clipboard-check', link: '/organizer/check-in' },
   { label: 'Event Analytics', icon: 'bi-graph-up', link: '/organizer/analytics' },
+  { label: 'Upcoming Events', icon: 'bi-calendar-event', link: '/organizer/upcoming-events' },
 ];
 
 const sidebarStyle = (open) => ({
@@ -22,7 +23,7 @@ const sidebarStyle = (open) => ({
   position: 'fixed',
   top: 0,
   left: 0,
-  paddingTop: '1rem',
+  paddingTop: '0.5rem',
   boxShadow: '2px 0 10px rgba(0,0,0,0.15)',
   display: 'flex',
   flexDirection: 'column',
