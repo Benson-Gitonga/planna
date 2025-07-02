@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Table, Button, Spinner, Alert, Container, OverlayTrigger,
-  Tooltip, InputGroup, Form, Modal
+  Table, Button, Container, OverlayTrigger,
+  Tooltip, InputGroup, Form, Modal, Pagination, Row, Col
 } from 'react-bootstrap';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import {
   FaFileUpload, FaPaperPlane, FaUsers, FaCalendarAlt,
   FaSort, FaSortUp, FaSortDown, FaSearch
 } from 'react-icons/fa';
+import ExportPDFButton from './ExportPDFButton';
 
 export default function EventsTable() {
   const [events, setEvents] = useState([]);
@@ -20,6 +21,9 @@ export default function EventsTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const eventsPerPage = 4;
 
   const [sendingEventId, setSendingEventId] = useState(null);
   const [sendingFinalEventId, setSendingFinalEventId] = useState(null);
@@ -32,6 +36,16 @@ export default function EventsTable() {
 
   const router = useRouter();
 
+  const getStatus = (dateStr) => {
+    const today = new Date();
+    const eventDate = new Date(dateStr);
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+    if (eventDate < today) return 'Past';
+    if (eventDate.getTime() === today.getTime()) return 'Today';
+    return 'Upcoming';
+  };
+
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -39,11 +53,11 @@ export default function EventsTable() {
         if (sessionRes.status === 401) return router.push('/login');
 
         const sessionData = await sessionRes.json();
-        if (sessionData.user.role !== 'organizer') return router.push('/unauthorized');
+        if (sessionData.user.role !== 'organizer') return router.push('/login');
 
         const res = await fetch('http://localhost:5000/api/events', { credentials: 'include' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to fetch events');
+        if (!res.ok) throw new Error(data.error || 'No events created yet');
 
         setEvents(data.events);
         setFilteredEvents(data.events);
@@ -58,13 +72,13 @@ export default function EventsTable() {
 
   useEffect(() => {
     const term = searchTerm.toLowerCase();
-    const filtered = events.filter(
-      (event) =>
-        event.event_name.toLowerCase().includes(term) ||
-        event.location.toLowerCase().includes(term)
+    const filtered = events.filter(e =>
+      (e.event_name.toLowerCase().includes(term) || e.location.toLowerCase().includes(term)) &&
+      (statusFilter === 'All' || getStatus(e.event_date) === statusFilter)
     );
     setFilteredEvents(filtered);
-  }, [searchTerm, events]);
+    setCurrentPage(1);
+  }, [searchTerm, events, statusFilter]);
 
   const handleSort = (field) => {
     const direction = sortField === field && sortDirection === 'asc' ? 'desc' : 'asc';
@@ -73,11 +87,10 @@ export default function EventsTable() {
         return direction === 'asc'
           ? new Date(a[field]) - new Date(b[field])
           : new Date(b[field]) - new Date(a[field]);
-      } else {
-        return direction === 'asc'
-          ? a[field].localeCompare(b[field])
-          : b[field].localeCompare(a[field]);
       }
+      return direction === 'asc'
+        ? a[field].localeCompare(b[field])
+        : b[field].localeCompare(a[field]);
     });
     setSortField(field);
     setSortDirection(direction);
@@ -92,21 +105,17 @@ export default function EventsTable() {
   };
 
   const handleSendInvites = async (eventId, eventName) => {
-    const confirmSend = confirm(`Send invites for ${eventName}?`);
-    if (!confirmSend) return;
-
+    if (!confirm(`Send invites for ${eventName}?`)) return;
     setSendingEventId(eventId);
-
     try {
       const res = await fetch(`http://localhost:5000/api/send_invites/${eventId}`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send invites');
-
+      if (!res.ok) throw new Error(data.error);
       alert(data.message);
-      setInvitedEvents((prev) => [...prev, eventId]);
+      setInvitedEvents(prev => [...prev, eventId]);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -115,23 +124,15 @@ export default function EventsTable() {
   };
 
   const handleSendFinalEmail = async (eventId, eventName) => {
-    const confirmSend = confirm(
-      `Are you sure you want to send the final email for "${eventName}"?\n\n` +
-      'This email will contain each guest’s assigned seat number and QR code for check-in. ' +
-      'Make sure everything is finalized before sending.'
-    );
-    if (!confirmSend) return;
-
+    if (!confirm(`Send final email for "${eventName}" with QR codes and seats?`)) return;
     setSendingFinalEventId(eventId);
-
     try {
       const res = await fetch(`http://localhost:5000/api/organizer/send-final-email/${eventId}`, {
         method: 'POST',
         credentials: 'include',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send final email');
-
+      if (!res.ok) throw new Error(data.error);
       alert(data.message);
       setFinalEmailSentEvents(prev => [...prev, eventId]);
     } catch (err) {
@@ -147,39 +148,64 @@ export default function EventsTable() {
         credentials: 'include',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch RSVP data');
-
+      if (!res.ok) throw new Error(data.error);
       setRsvpData(data.rsvps);
       setActiveRSVPEventName(eventName);
       setShowRSVPModal(true);
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'No RSVP responses made yet');
     }
   };
 
-  if (loading) return <Spinner animation="border" className="d-block mx-auto mt-5" />;
-  if (error) return <Alert variant="danger" className="mt-3">{error}</Alert>;
+  const statusBadge = (status) => {
+    const variants = { Past: 'danger', Today: 'success', Upcoming: 'primary' };
+    return <span className={`badge bg-${variants[status]}`}>{status}</span>;
+  };
+
+  const tooltipWrapper = (condition, text, children) => (
+    condition ? (
+      <OverlayTrigger overlay={<Tooltip>{text}</Tooltip>} placement="top">
+        <span className="d-inline-block" style={{ pointerEvents: 'auto' }}>{children}</span>
+      </OverlayTrigger>
+    ) : children
+  );
+
+  const indexOfLast = currentPage * eventsPerPage;
+  const indexOfFirst = indexOfLast - eventsPerPage;
+  const currentEvents = filteredEvents.slice(indexOfFirst, indexOfLast);
+  const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
 
   return (
     <Container className="py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4 className="d-flex align-items-center gap-2">
-          <FaCalendarAlt className="text-primary" />
-          Manage Your Events
-        </h4>
+      <Row className="mb-4 align-items-center">
+        <Col>
+          <h4 className="d-flex align-items-center gap-2">
+            <FaCalendarAlt className="text-primary" />
+            Manage Your Events
+          </h4>
+        </Col>
+        <Col md="auto">
+          <InputGroup>
+            <InputGroup.Text><FaSearch /></InputGroup.Text>
+            <Form.Control
+              type="text"
+              placeholder="Search events..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </InputGroup>
+        </Col>
+        <Col md="auto">
+          <Form.Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option>All</option>
+            <option>Past</option>
+            <option>Today</option>
+            <option>Upcoming</option>
+          </Form.Select>
+        </Col>
+      </Row>
 
-        <InputGroup style={{ maxWidth: '300px' }}>
-          <InputGroup.Text><FaSearch /></InputGroup.Text>
-          <Form.Control
-            type="text"
-            placeholder="Search events..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-      </div>
-
-      <Table striped bordered hover responsive className="shadow-sm">
+      <Table striped bordered hover responsive>
         <thead className="table-dark text-white">
           <tr>
             <th>#</th>
@@ -191,118 +217,105 @@ export default function EventsTable() {
             </th>
             <th>Location</th>
             <th>Time</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {filteredEvents.map((event, index) => (
-            <tr key={event.event_id}>
-              <td>{index + 1}</td>
-              <td>{event.event_name}</td>
-              <td>{new Date(event.event_date).toLocaleDateString('en-GB')}</td>
-              <td>{event.location}</td>
-              <td>{event.start_time} - {event.end_time}</td>
-              <td>
-                <div className="d-flex flex-wrap gap-2">
-                  <OverlayTrigger placement="top" overlay={<Tooltip>Upload CSV File</Tooltip>}>
-                    <Link href={`/organizer/csvupload?eventId=${event.event_id}`} passHref>
-                      <Button variant="outline-primary" size="sm">
-                        <FaFileUpload className="me-1" />
-                        Upload
-                      </Button>
-                    </Link>
-                  </OverlayTrigger>
+          {currentEvents.map((event, index) => {
+            const status = getStatus(event.event_date);
+            const isPast = status === 'Past';
 
-                  <OverlayTrigger placement="top" overlay={<Tooltip>Send Invites</Tooltip>}>
+            return (
+              <tr key={event.event_id}>
+                <td>{indexOfFirst + index + 1}</td>
+                <td>{event.event_name}</td>
+                <td>{new Date(event.event_date).toLocaleDateString('en-GB')}</td>
+                <td>{event.location}</td>
+                <td>{event.start_time} - {event.end_time}</td>
+                <td>{statusBadge(status)}</td>
+                <td className="d-flex flex-wrap gap-2">
+                  {/* Upload */}
+                  {tooltipWrapper(isPast, 'Upload disabled for past events',
+                    <Button as={Link} href={`/organizer/csvupload?eventId=${event.event_id}`} variant="outline-primary" size="sm" disabled={isPast}>
+                      <FaFileUpload className="me-1" /> Upload
+                    </Button>
+                  )}
+
+                  {/* Send Invite */}
+                  {tooltipWrapper(isPast, 'Invites cannot be sent for past events',
                     <Button
                       variant="outline-success"
                       size="sm"
+                      disabled={isPast || sendingEventId === event.event_id || invitedEvents.includes(event.event_id)}
                       onClick={() => handleSendInvites(event.event_id, event.event_name)}
-                      disabled={sendingEventId === event.event_id || invitedEvents.includes(event.event_id)}
                     >
-                      {sendingEventId === event.event_id ? (
-                        <>
-                          <Spinner
-                            as="span"
-                            animation="border"
-                            size="sm"
-                            role="status"
-                            aria-hidden="true"
-                            className="me-1"
-                          />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <FaPaperPlane className="me-1" />
-                          {invitedEvents.includes(event.event_id) ? 'Sent' : 'Invite'}
-                        </>
-                      )}
+                      <FaPaperPlane className="me-1" />
+                      {invitedEvents.includes(event.event_id) ? 'Sent' : 'Invite'}
                     </Button>
-                  </OverlayTrigger>
+                  )}
 
-                  <OverlayTrigger placement="top" overlay={<Tooltip>View Guest List</Tooltip>}>
-                    <Link href={`/organizer/guest-list/${event.event_id}`} passHref>
-                      <Button variant="outline-info" size="sm">
-                        <FaUsers className="me-1" />
-                        Guests
-                      </Button>
-                    </Link>
-                  </OverlayTrigger>
+                  {/* Guests */}
+                  <Button
+                    as={Link}
+                    href={`/organizer/guest-list/${event.event_id}`}
+                    variant="outline-info"
+                    size="sm"
+                  >
+                    <FaUsers className="me-1" /> Guests
+                  </Button>
 
-                  <OverlayTrigger placement="top" overlay={<Tooltip>View RSVP Responses</Tooltip>}>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => handleViewRSVPs(event.event_id, event.event_name)}
-                    >
-                      <FaUsers className="me-1" />
-                      View RSVPs
-                    </Button>
-                  </OverlayTrigger>
+                  {/* View RSVPs */}
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => handleViewRSVPs(event.event_id, event.event_name)}
+                  >
+                    <FaUsers className="me-1" /> View RSVPs
+                  </Button>
 
-                  <OverlayTrigger placement="top" overlay={<Tooltip>Seating Arrangement</Tooltip>}>
-                    <Link href={`/organizer/seating/${event.event_id}`} passHref>
-                      <Button variant="outline-warning" size="sm">
-                        <i className="bi bi-grid-3x3-gap me-1"></i>
-                        Seating
-                      </Button>
-                    </Link>
-                  </OverlayTrigger>
+                  {/* Seating */}
+                  <Button
+                    as={Link}
+                    href={`/organizer/seating/${event.event_id}`}
+                    variant="outline-warning"
+                    size="sm"
+                  >
+                    <i className="bi bi-grid-3x3-gap me-1"></i> Seating
+                  </Button>
 
-                  <OverlayTrigger placement="top" overlay={<Tooltip>Final Email with QR Code</Tooltip>}>
+                  {/* Final Email */}
+                  {tooltipWrapper(isPast, 'Final email disabled for past events',
                     <Button
                       variant={finalEmailSentEvents.includes(event.event_id) ? 'success' : 'outline-danger'}
                       size="sm"
                       onClick={() => handleSendFinalEmail(event.event_id, event.event_name)}
-                      disabled={sendingFinalEventId === event.event_id || finalEmailSentEvents.includes(event.event_id)}
+                      disabled={isPast || sendingFinalEventId === event.event_id || finalEmailSentEvents.includes(event.event_id)}
                     >
-                      {sendingFinalEventId === event.event_id ? (
-                        <>
-                          <Spinner
-                            as="span"
-                            animation="border"
-                            size="sm"
-                            role="status"
-                            aria-hidden="true"
-                            className="me-1"
-                          />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <FaPaperPlane className="me-1" />
-                          {finalEmailSentEvents.includes(event.event_id) ? 'Final Sent' : 'Final Email'}
-                        </>
-                      )}
+                      <FaPaperPlane className="me-1" />
+                      {finalEmailSentEvents.includes(event.event_id) ? 'Final Sent' : 'Final Email'}
                     </Button>
-                  </OverlayTrigger>
-                </div>
-              </td>
-            </tr>
-          ))}
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </Table>
+
+      {totalPages > 1 && (
+        <Pagination className="justify-content-center mt-3">
+          {[...Array(totalPages)].map((_, i) => (
+            <Pagination.Item
+              key={i}
+              active={i + 1 === currentPage}
+              onClick={() => setCurrentPage(i + 1)}
+            >
+              {i + 1}
+            </Pagination.Item>
+          ))}
+        </Pagination>
+      )}
 
       {/* RSVP Modal */}
       <Modal size="lg" show={showRSVPModal} onHide={() => setShowRSVPModal(false)}>
@@ -313,32 +326,51 @@ export default function EventsTable() {
           {rsvpData.length === 0 ? (
             <p>No RSVP responses yet.</p>
           ) : (
-            <Table striped bordered hover responsive>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Guest Name</th>
-                  <th>Email</th>
-                  <th>Category</th>
-                  <th>RSVP</th>
-                  <th>Checked In</th>
-                  <th>Seat #</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rsvpData.map((rsvp, index) => (
-                  <tr key={rsvp.guest_id}>
-                    <td>{index + 1}</td>
-                    <td>{rsvp.first_name} {rsvp.last_name}</td>
-                    <td>{rsvp.email_address}</td>
-                    <td>{rsvp.category}</td>
-                    <td>{rsvp.rsvp_status}</td>
-                    <td>{rsvp.check_in_status ? 'Yes' : 'No'}</td>
-                    <td>{rsvp.seat_number || '—'}</td>
+            <>
+              <div className="mb-3 text-end">
+                <ExportPDFButton
+                  data={rsvpData}
+                  filename={`${activeRSVPEventName.replace(/\s+/g, '_')}_rsvp.pdf`}
+                  title={`RSVPs - ${activeRSVPEventName}`}
+                  columns={['#', 'Guest Name', 'Email', 'Category', 'RSVP', 'Checked In', 'Seat #']}
+                  mapRow={(r, i) => [
+                    i + 1,
+                    `${r.first_name} ${r.last_name}`,
+                    r.email_address,
+                    r.category,
+                    r.rsvp_status,
+                    r.check_in_status ? 'Yes' : 'No',
+                    r.seat_number || '—',
+                  ]}
+                />
+              </div>
+              <Table striped bordered hover responsive>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Guest Name</th>
+                    <th>Email</th>
+                    <th>Category</th>
+                    <th>RSVP</th>
+                    <th>Checked In</th>
+                    <th>Seat #</th>
                   </tr>
-                ))}
-              </tbody>
-            </Table>
+                </thead>
+                <tbody>
+                  {rsvpData.map((r, i) => (
+                    <tr key={r.guest_id}>
+                      <td>{i + 1}</td>
+                      <td>{r.first_name} {r.last_name}</td>
+                      <td>{r.email_address}</td>
+                      <td>{r.category}</td>
+                      <td>{r.rsvp_status}</td>
+                      <td>{r.check_in_status ? 'Yes' : 'No'}</td>
+                      <td>{r.seat_number || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </>
           )}
         </Modal.Body>
       </Modal>
