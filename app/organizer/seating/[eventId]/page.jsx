@@ -163,7 +163,7 @@ export default function SeatingPage() {
 
   return (
     <Container className="py-5">
-      <h2 className="mb-4 fw-bold text-center">Seating for Event #{eventId}</h2>
+      <h4 className="mb-4 fw-bold text-center">Seating Arrangement</h4>
 
       {!configExists && (
         <Card className="p-4 shadow-sm mb-5">
