@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Form, Button, Container, Row, Col, Alert, Spinner, Card
 } from 'react-bootstrap';
@@ -10,6 +10,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 export default function SeatingPage() {
   const { eventId } = useParams();
+  const router = useRouter();
 
   const [layoutType, setLayoutType] = useState('table');
   const [tableCount, setTableCount] = useState(2);
@@ -123,23 +124,81 @@ export default function SeatingPage() {
     const { source, destination, draggableId } = result;
     if (!destination || destination.droppableId === source.droppableId) return;
 
-    const seat = destination.droppableId;
     const guestId = parseInt(draggableId);
+    const fromSeat = source.droppableId;
+    const toSeat = destination.droppableId;
 
+    try {
+      const replacedGuest = assigned[toSeat];
+
+      // Assign dragged guest to new seat
+      const res = await fetch(`${BACKEND_URL}/api/seating/${eventId}/guest/${guestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ newSeatNumber: toSeat === 'unassigned' ? null : toSeat }),
+      });
+
+      if (!res.ok) {
+        setMessage('Failed to assign seat.');
+        return;
+      }
+
+      // If replacing another guest, unassign them
+      if (replacedGuest) {
+        await fetch(`${BACKEND_URL}/api/seating/${eventId}/guest/${replacedGuest.guest_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ newSeatNumber: null }),
+        });
+      }
+
+      const guest = guests.find((g) => g.guest_id === guestId);
+      setAssigned(prev => {
+        const updated = { ...prev };
+        if (fromSeat !== 'unassigned') delete updated[fromSeat];
+        updated[toSeat] = guest;
+        return updated;
+      });
+
+      setGuests(prev =>
+        prev.map(g => {
+          if (g.guest_id === guestId) return { ...g, seat_number: toSeat === 'unassigned' ? null : toSeat };
+          if (replacedGuest && g.guest_id === replacedGuest.guest_id) return { ...g, seat_number: null };
+          return g;
+        })
+      );
+
+      setMessage('');
+    } catch (err) {
+      setMessage('Failed to update seat assignment.');
+    }
+  };
+
+  const handleUnassign = async (seat, guestId) => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/seating/${eventId}/guest/${guestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ newSeatNumber: seat }),
+        body: JSON.stringify({ newSeatNumber: null }),
       });
-
       if (res.ok) {
-        const guest = guests.find((g) => g.guest_id === guestId);
-        setAssigned((prev) => ({ ...prev, [seat]: guest }));
+        setAssigned(prev => {
+          const updated = { ...prev };
+          delete updated[seat];
+          return updated;
+        });
+        setGuests(prev =>
+          prev.map(g => g.guest_id === guestId ? { ...g, seat_number: null } : g)
+        );
+        setMessage('');
+      } else {
+        setMessage('Failed to unassign seat.');
       }
     } catch (err) {
-      console.error('Drag drop error:', err);
+      setMessage('Failed to unassign seat.');
     }
   };
 
@@ -264,8 +323,20 @@ export default function SeatingPage() {
                           <FaChair className="me-1 text-secondary" /> {seat}
                         </div>
                         {assigned[seat] && (
-                          <div className="guest-tag filled p-2 bg-info text-white rounded">
-                            <FaUsers className="me-2" /> {assigned[seat].first_name} {assigned[seat].last_name}
+                          <div className="guest-tag filled p-2 bg-info text-white rounded d-flex align-items-center justify-content-between">
+                            <span>
+                              <FaUsers className="me-2" /> {assigned[seat].first_name} {assigned[seat].last_name}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="light"
+                              className="ms-2 py-0 px-2"
+                              onClick={() => handleUnassign(seat, assigned[seat].guest_id)}
+                              title="Remove from seat"
+                              style={{ fontSize: '1rem', lineHeight: 1 }}
+                            >
+                              &times;
+                            </Button>
                           </div>
                         )}
                         {provided.placeholder}
@@ -274,10 +345,27 @@ export default function SeatingPage() {
                   </Droppable>
                 ))}
               </div>
+              <div className="text-end mt-4">
+                <Button variant="success" size="lg" onClick={() => router.push('/organizer')}>
+                  Done
+                </Button>
+              </div>
             </Col>
           </DragDropContext>
         </Row>
       )}
+      <style jsx global>{`
+        .guest-tag .btn {
+          font-weight: bold;
+          color: #dc3545;
+          background: #fff;
+          border: none;
+        }
+        .guest-tag .btn:hover {
+          background: #ffeaea;
+          color: #b8003a;
+        }
+      `}</style>
     </Container>
   );
 }

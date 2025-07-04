@@ -946,6 +946,52 @@ app.post('/api/seating/guest/:eventId', requireLogin, requireOrganizer, async (r
   }
 });
 
+
+// Route to unassign a guest from their seat
+app.put('/api/seating/:eventId/guest/:guestId', requireLogin, requireOrganizer, async (req, res) => {
+  const { eventId, guestId } = req.params;
+  const organizerId = req.session.user.id;
+  const { newSeatNumber } = req.body; // Will be null for unassign
+
+  try {
+    // Check if organizer owns the event
+    const eventCheck = await db.query(
+      'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Unauthorized to update seating for this event' });
+    }
+
+    // Confirm guest is part of this event
+    const guestCheck = await db.query(
+      'SELECT * FROM guests WHERE guest_id = $1 AND event_id = $2',
+      [guestId, eventId]
+    );
+
+    if (guestCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Guest not found in this event' });
+    }
+
+    // Update the seat number (to NULL if unassigning)
+    const result = await db.query(
+      'UPDATE guests SET seat_number = $1 WHERE guest_id = $2 RETURNING *',
+      [newSeatNumber, guestId]
+    );
+
+    res.status(200).json({
+      message: newSeatNumber ? 'Seat reassigned successfully' : 'Guest unassigned from seat',
+      guest: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Seat unassignment error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+
         
 
 //Route to allow the organizer to update an existing seating configuration for an event
