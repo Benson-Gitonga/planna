@@ -20,7 +20,7 @@ export default function UploadCsvForm() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
-  const [progress, setProgress] = useState(100);
+  const [progress, setProgress] = useState(0);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -30,14 +30,27 @@ export default function UploadCsvForm() {
     if (idFromURL) setEventId(idFromURL);
   }, [searchParams]);
 
+  // Progress bar animation
   useEffect(() => {
     let timer;
-    if (showProgress && progress > 0) {
-      timer = setTimeout(() => setProgress((prev) => prev - 2), 30); // smoother 1.5s
+    if (showProgress && progress < 100) {
+      timer = setInterval(() => {
+        setProgress((prev) => Math.min(prev + 10, 100));
+      }, 120);
     }
-    if (progress <= 0) router.push('/organizer');
-    return () => clearTimeout(timer);
-  }, [showProgress, progress, router]);
+    return () => clearInterval(timer);
+  }, [showProgress, progress]);
+
+  // Redirect after progress completes
+  useEffect(() => {
+    if (progress === 100 && showProgress) {
+      const timeout = setTimeout(() => {
+        setShowProgress(false);
+        router.push('/organizer');
+      }, 400);
+      return () => clearTimeout(timeout);
+    }
+  }, [progress, showProgress, router]);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -75,6 +88,7 @@ export default function UploadCsvForm() {
 
       setFile(null);
       setShowProgress(true);
+      setProgress(0);
     } catch (err) {
       setError(err.message || 'Upload failed');
     } finally {
@@ -84,28 +98,20 @@ export default function UploadCsvForm() {
 
   return (
     <>
-      {/* Progress Bar Top-right */}
+      {/* Progress Bar Top (thin, similar to Register page) */}
       {showProgress && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          width: '250px',
-          zIndex: 1050
-        }}>
+        <div className="csv-progress-bar">
           <ProgressBar
             now={progress}
-            label={`${Math.ceil(progress)}%`}
-            variant="success"
-            striped
             animated
+            variant="info"
+            style={{ height: '4px', background: '#e0f7fa', borderRadius: 0 }}
           />
         </div>
       )}
 
-      <Container fluid className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh', background: '#f8f9fc' }}>
+      <Container fluid className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh', background: '#f8f9fc', position: 'relative' }}>
         <Row className="shadow-lg bg-white rounded-4 overflow-hidden w-100" style={{ maxWidth: '900px' }}>
-          
           {/* Left section - illustration or info */}
           <Col md={5} className="d-none d-md-flex bg-primary text-white align-items-center justify-content-center p-4">
             <div className="text-center">
@@ -162,6 +168,23 @@ export default function UploadCsvForm() {
           </Col>
         </Row>
       </Container>
+      <style jsx global>{`
+        .csv-progress-bar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          z-index: 2000;
+          background: transparent;
+        }
+        .progress-bar {
+          background: linear-gradient(90deg, #00e0b8 0%, #23272b 100%) !important;
+          transition: width 0.3s cubic-bezier(.4,1.3,.6,1);
+        }
+        .progress {
+          background: transparent !important;
+        }
+      `}</style>
     </>
   );
 }
