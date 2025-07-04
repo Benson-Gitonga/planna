@@ -2,64 +2,58 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Table,
-  Spinner,
-  Alert,
-  Container,
-  Row,
-  Col,
-  Pagination,
-  Form,
-  Badge,
-  ButtonGroup,
-  OverlayTrigger,
-  Tooltip,
+  Table, Spinner, Alert, Container, Row, Col, Pagination,
+  Form, Badge, ButtonGroup, OverlayTrigger, Tooltip, Button, Modal
 } from 'react-bootstrap';
 import ExportCSVButton from './ExportCSVButton';
 import ExportPDFButton from './ExportPdfButton';
-import { FaSortDown, FaSortUp } from 'react-icons/fa';
+import { FaSortDown, FaSortUp, FaEdit } from 'react-icons/fa';
 
 export default function MyEvents() {
   const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortOrder, setSortOrder] = useState('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    eventName: '',
+    eventDate: '',
+    eventLocation: '',
+    startTime: '',
+    endTime: '',
+  });
+
   const itemsPerPage = 5;
 
   useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const res = await fetch('http://localhost:5000/api/events', {
-          method: 'GET',
-          credentials: 'include',
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'No events created yet');
-        setEvents(data.events);
-        setFilteredEvents(data.events);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchEvents();
   }, []);
+
+  const fetchEvents = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/events', {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch events');
+      setEvents(data.events);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
   };
 
-  const formatTime = (timeStr) => {
-    const [hours, minutes] = timeStr.split(':');
-    return `${hours}:${minutes}`;
-  };
+  const formatTime = (timeStr) => timeStr?.slice(0, 5);
 
   const determineStatus = (dateStr) => {
     const eventDate = new Date(dateStr);
@@ -67,112 +61,100 @@ export default function MyEvents() {
     today.setHours(0, 0, 0, 0);
     eventDate.setHours(0, 0, 0, 0);
 
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay());
-
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-
     if (eventDate.getTime() === today.getTime()) return 'Today';
-    if (eventDate > today && eventDate <= endOfWeek) return 'This Week';
     if (eventDate < today) return 'Past';
-    return 'Upcoming';
+    const diff = (eventDate - today) / (1000 * 60 * 60 * 24);
+    return diff <= 7 ? 'This Week' : 'Upcoming';
   };
 
   const getStatusBadge = (dateStr) => {
     const status = determineStatus(dateStr);
-    const tooltipText = {
-      'Today': 'This event is happening today!',
-      'This Week': 'This event is scheduled for this week.',
-      'Upcoming': 'Scheduled for a future date.',
-      'Past': 'This event has already occurred.',
-    };
     const variantMap = {
-      'Today': 'primary',
+      Today: 'primary',
       'This Week': 'success',
-      'Upcoming': 'warning',
-      'Past': 'danger',
+      Upcoming: 'warning',
+      Past: 'danger',
     };
 
     return (
-      <OverlayTrigger overlay={<Tooltip>{tooltipText[status]}</Tooltip>}>
+      <OverlayTrigger overlay={<Tooltip>{status}</Tooltip>}>
         <Badge bg={variantMap[status]}>{status}</Badge>
       </OverlayTrigger>
     );
   };
 
   const handleSort = () => {
-    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
   };
 
-  const sortIcon = sortOrder === 'asc' ? <FaSortDown /> : <FaSortUp />;
-
-  const filteredAndSortedEvents = [...filteredEvents]
-    .filter(event => {
-      const matchesSearch =
-        event.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.location.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter ? determineStatus(event.event_date) === statusFilter : true;
-      return matchesSearch && matchesStatus;
-    })
+  const sortedEvents = [...events]
+    .filter((e) =>
+      (e.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.location.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (!statusFilter || determineStatus(e.event_date) === statusFilter)
+    )
     .sort((a, b) => {
       const dateA = new Date(a.event_date);
       const dateB = new Date(b.event_date);
       return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
-  const totalPages = Math.ceil(filteredAndSortedEvents.length / itemsPerPage);
-  const indexOfLastEvent = currentPage * itemsPerPage;
-  const indexOfFirstEvent = indexOfLastEvent - itemsPerPage;
-  const currentEvents = filteredAndSortedEvents.slice(indexOfFirstEvent, indexOfLastEvent);
-
-  const renderPagination = () => (
-    <Pagination className="justify-content-center mt-3">
-      <Pagination.Prev
-        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-        disabled={currentPage === 1}
-      />
-      {[...Array(totalPages)].map((_, i) => (
-        <Pagination.Item
-          key={i + 1}
-          active={i + 1 === currentPage}
-          onClick={() => setCurrentPage(i + 1)}
-        >
-          {i + 1}
-        </Pagination.Item>
-      ))}
-      <Pagination.Next
-        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-        disabled={currentPage === totalPages}
-      />
-    </Pagination>
+  const totalPages = Math.ceil(sortedEvents.length / itemsPerPage);
+  const currentEvents = sortedEvents.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
-  if (loading) return <Spinner animation="border" className="d-block mx-auto mt-5" />;
-  if (error) return <Alert variant="danger" className="mt-3">{error}</Alert>;
+  const openEditModal = (event) => {
+    setSelectedEvent(event);
+    setFormData({
+      eventName: event.event_name,
+      eventDate: event.event_date.slice(0, 10),
+      eventLocation: event.location,
+      startTime: event.start_time,
+      endTime: event.end_time,
+    });
+    setShowModal(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`http://localhost:5000/api/organizer/edit-event/${selectedEvent.event_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Update failed');
+      setShowModal(false);
+      fetchEvents();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   return (
     <Container className="py-4">
       <Row className="align-items-center mb-4">
-        <Col md={6}>
-          <h3 className="fw-bold text-primary">📅 My Events</h3>
-        </Col>
-        <Col md={6} className="text-end">
+        <Col><h3 className="text-primary fw-bold">📅 My Events</h3></Col>
+        <Col className="text-end">
           <ButtonGroup>
-            <ExportCSVButton data={events} filename="events_export.csv" className="me-2" />
+            <ExportCSVButton data={events} filename="events_export.csv" />
             <ExportPDFButton data={events} filename="events_export.pdf" />
           </ButtonGroup>
         </Col>
       </Row>
 
       <Row className="mb-3">
-        <Col md={6} className="mb-2 mb-md-0">
+        <Col md={6}>
           <Form.Control
             type="text"
-            placeholder="🔍 Search by event name or location"
+            placeholder="🔍 Search by name or location"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="shadow-sm rounded-pill px-3"
+            className="shadow-sm rounded-pill"
           />
         </Col>
         <Col md={6}>
@@ -190,42 +172,115 @@ export default function MyEvents() {
         </Col>
       </Row>
 
-      <Table responsive bordered hover className="shadow-sm rounded table-striped align-middle">
+      <Table striped hover bordered responsive className="shadow-sm">
         <thead className="table-dark">
           <tr>
             <th>#</th>
             <th>Event Name</th>
-            <th onClick={handleSort} style={{ cursor: 'pointer' }}>
-              Date {sortIcon}
+            <th style={{ cursor: 'pointer' }} onClick={handleSort}>
+              Date {sortOrder === 'asc' ? <FaSortDown /> : <FaSortUp />}
             </th>
             <th>Status</th>
             <th>Location</th>
             <th>Time</th>
+            <th>Edit</th>
           </tr>
         </thead>
         <tbody>
-          {currentEvents.length === 0 ? (
-            <tr>
-              <td colSpan="6" className="text-center text-muted py-4">
-                <em>No matching events found.</em>
-              </td>
-            </tr>
+          {loading ? (
+            <tr><td colSpan="7"><Spinner animation="border" className="mx-auto d-block my-3" /></td></tr>
+          ) : sortedEvents.length === 0 ? (
+            <tr><td colSpan="7" className="text-center">No matching events.</td></tr>
           ) : (
-            currentEvents.map((event, index) => (
+            currentEvents.map((event, idx) => (
               <tr key={event.event_id}>
-                <td>{indexOfFirstEvent + index + 1}</td>
+                <td>{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                 <td className="text-capitalize">{event.event_name}</td>
                 <td>{formatDate(event.event_date)}</td>
                 <td>{getStatusBadge(event.event_date)}</td>
                 <td className="text-capitalize">{event.location}</td>
                 <td>{formatTime(event.start_time)} - {formatTime(event.end_time)}</td>
+                <td>
+                  <Button variant="outline-primary" size="sm" onClick={() => openEditModal(event)}>
+                    <FaEdit />
+                  </Button>
+                </td>
               </tr>
             ))
           )}
         </tbody>
       </Table>
 
-      {totalPages > 1 && renderPagination()}
+      <Pagination className="justify-content-center">
+        <Pagination.Prev disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)} />
+        {[...Array(totalPages)].map((_, i) => (
+          <Pagination.Item key={i} active={currentPage === i + 1} onClick={() => setCurrentPage(i + 1)}>
+            {i + 1}
+          </Pagination.Item>
+        ))}
+        <Pagination.Next disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => p + 1)} />
+      </Pagination>
+
+      {/* 🔧 Edit Modal */}
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+        <Modal.Header closeButton><Modal.Title>Edit Event</Modal.Title></Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleEditSubmit}>
+            <Form.Group className="mb-3">
+              <Form.Label>Event Name</Form.Label>
+              <Form.Control
+                type="text"
+                value={formData.eventName}
+                onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Date</Form.Label>
+              <Form.Control
+                type="date"
+                value={formData.eventDate}
+                onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Location</Form.Label>
+              <Form.Control
+                type="text"
+                value={formData.eventLocation}
+                onChange={(e) => setFormData({ ...formData, eventLocation: e.target.value })}
+                required
+              />
+            </Form.Group>
+            <Row>
+              <Col>
+                <Form.Group className="mb-3">
+                  <Form.Label>Start Time</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={formData.startTime}
+                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col>
+                <Form.Group className="mb-3">
+                  <Form.Label>End Time</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Button variant="primary" type="submit" className="w-100">Update Event</Button>
+          </Form>
+        </Modal.Body>
+      </Modal>
     </Container>
   );
 }

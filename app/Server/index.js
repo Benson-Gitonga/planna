@@ -408,6 +408,58 @@ app.delete('/api/organizer/delete-guest/:eventId/:email', requireLogin, requireO
     }
 })
 
+//Route to allow an organizer to edit an event
+app.put('/api/organizer/edit-event/:eventId', requireLogin, requireOrganizer, async (req,res) => {
+    const eventId = req.params.eventId;
+    const organizerId = req.session.user.id;
+    const { eventName, eventDate, eventLocation, startTime, endTime } = req.body;
+
+    if (!eventName || !eventDate || !eventLocation || !startTime || !endTime) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Validate event date is not in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eventDay = new Date(eventDate);
+    if (eventDay < today) {
+        return res.status(400).json({ error: 'Event date cannot be in the past' });
+    }
+
+    // Validate time logic (handle overnight events)
+    const startDateTime = new Date(`${eventDate}T${startTime}`);
+    let endDateTime = new Date(`${eventDate}T${endTime}`);
+    if (endDateTime <= startDateTime) {
+        // If end time is before or equal to start time, assume it passes midnight
+        endDateTime.setDate(endDateTime.getDate() + 1);
+    }
+
+    try {
+        // Check if the event exists and belongs to the current organizer
+        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
+        if(eventCheck.rows.length === 0){
+            //If the event does not exist or does not belong to the organizer, return an error
+            return res.status(403).json({
+                error: 'Unauthorized to edit this event'
+            })
+        }
+        
+        // Update the event details in the database
+        await db.query(
+            `UPDATE events SET event_name = $1, event_date = $2, location = $3, start_time = $4, end_time = $5 
+             WHERE event_id = $6 AND organizer_id = $7`,
+            [eventName, eventDate, eventLocation, startTime, endTime, eventId, organizerId]
+        );
+
+        res.status(200).json({
+            message: 'Event updated successfully'
+        });
+    } catch (err) {
+        console.error('Error updating the event:', err);
+        return res.status(500).json({ error: 'Failed to update event' });
+    }
+})
+
 
 
 
