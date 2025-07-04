@@ -1642,7 +1642,7 @@ app.post('/api/guest/cancel-rsvp', async (req,res) => {
     try{
         const result = await db.query(`
             SELECT g.guest_id, g.email_address, g.first_name, g.last_name, e.event_name
-            FROM guest g
+            FROM guests g
             JOIN events e ON g.event_id = e.event_id
             WHERE g.access_code = $1            
             `, [access_code]);

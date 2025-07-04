@@ -28,6 +28,11 @@ export default function GuestAccessPage() {
   };
 
   const handleCancelRSVP = async () => {
+    // If already cancelled, show notification and do not proceed
+    if (cancelMsg) {
+      setError('You have already cancelled your RSVP.');
+      return;
+    }
     setCancelling(true);
     setCancelMsg('');
     setError('');
@@ -141,14 +146,17 @@ export default function GuestAccessPage() {
                     </Col>
                   </Row>
                   <div className="mt-4 text-end">
-                    <Button
-                      variant="outline-danger"
-                      onClick={handleCancelRSVP}
-                      disabled={cancelling}
-                      className="fw-bold"
-                    >
-                      {cancelling ? "Cancelling..." : "Cancel RSVP"}
-                    </Button>
+                    {/* Hide the button if RSVP was cancelled */}
+                    {!cancelMsg && (
+                      <Button
+                        variant="outline-danger"
+                        onClick={handleCancelRSVP}
+                        disabled={cancelling}
+                        className="fw-bold"
+                      >
+                        {cancelling ? "Cancelling..." : "Cancel RSVP"}
+                      </Button>
+                    )}
                   </div>
                 </Card.Body>
               </Card>
@@ -211,16 +219,16 @@ export default function GuestAccessPage() {
           transition: border-color 0.2s, box-shadow 0.2s;
         }
         .input-animate:focus {
-          border-color: #00e0b8 !important;
+          border-color:rgb(24, 134, 113) !important;
           box-shadow: 0 0 0 0.15rem rgba(0,224,184,0.25);
           background: #fff !important;
-          color: #121212 !important;
+          color:rgb(16, 16, 16) !important;
         }
         .btn-animate {
           transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
         }
         .btn-animate:hover, .btn-animate:focus {
-          background: linear-gradient(90deg, #00e0b8 0%, #23272b 100%) !important;
+          background: linear-gradient(90deg,rgb(235, 240, 239) 0%, #23272b 100%) !important;
           box-shadow: 0 4px 24px rgba(0,224,184,0.18);
           transform: translateY(-2px) scale(1.03);
         }
