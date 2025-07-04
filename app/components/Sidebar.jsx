@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -16,7 +16,7 @@ const actions = [
 
 const sidebarStyle = (open) => ({
   width: open ? 220 : 70,
-  transition: 'width 0.3s ease',
+  transition: 'width 0.3s cubic-bezier(.4,1.3,.6,1)',
   background: '#1f1f2e',
   color: '#fff',
   height: '100vh',
@@ -57,6 +57,9 @@ const listItemStyle = (open) => ({
   justifyContent: open ? 'flex-start' : 'center',
   color: '#fff',
   width: '100%',
+  borderRadius: '8px',
+  marginBottom: 4,
+  position: 'relative',
 });
 
 const linkStyle = {
@@ -71,10 +74,14 @@ const iconStyle = {
   fontSize: 20,
   minWidth: 24,
   marginRight: 16,
+  transition: 'margin 0.3s',
 };
 
-const OrganizerSidebar = ({ open, toggleSidebar }) => {
+const OrganizerSidebar = () => {
+  const [open, setOpen] = useState(false); // default to collapsed
   const router = useRouter();
+
+  const toggleSidebar = () => setOpen((prev) => !prev);
 
   const handleLogout = async () => {
     try {
@@ -87,7 +94,6 @@ const OrganizerSidebar = ({ open, toggleSidebar }) => {
 
       if (!res.ok) throw new Error(data.error || 'Logout failed');
 
-      // Redirect to homepage
       router.push('/');
     } catch (err) {
       alert('Logout failed. Please try again.');
@@ -101,6 +107,7 @@ const OrganizerSidebar = ({ open, toggleSidebar }) => {
         onClick={toggleSidebar}
         style={toggleButtonStyle(open)}
         aria-label="Toggle sidebar"
+        title={open ? "Collapse sidebar" : "Expand sidebar"}
       >
         <i className={`bi ${open ? 'bi-chevron-left' : 'bi-chevron-right'}`} style={{ fontSize: 22 }} />
       </button>
@@ -110,7 +117,7 @@ const OrganizerSidebar = ({ open, toggleSidebar }) => {
           <li key={action.label} style={listItemStyle(open)} className="sidebar-item">
             <Link href={action.link} style={linkStyle}>
               <i className={`bi ${action.icon}`} style={iconStyle}></i>
-              {open && <span>{action.label}</span>}
+              {open && <span style={{ transition: 'opacity 0.2s' }}>{action.label}</span>}
             </Link>
           </li>
         ))}
@@ -119,10 +126,19 @@ const OrganizerSidebar = ({ open, toggleSidebar }) => {
         <li style={listItemStyle(open)} className="sidebar-item" onClick={handleLogout}>
           <div style={linkStyle}>
             <i className="bi bi-box-arrow-right" style={iconStyle}></i>
-            {open && <span>Logout</span>}
+            {open && <span style={{ transition: 'opacity 0.2s' }}>Logout</span>}
           </div>
         </li>
       </ul>
+      <style jsx global>{`
+        .sidebar-item:hover {
+          background: #23272b;
+          color: #00e0b8 !important;
+        }
+        .sidebar-item:hover i {
+          color: #00e0b8 !important;
+        }
+      `}</style>
     </div>
   );
 };

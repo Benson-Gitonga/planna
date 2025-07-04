@@ -5,27 +5,46 @@ import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap'
 
 export default function GuestAccessPage() {
   const [accessCode, setAccessCode] = useState('');
-  const [lastName, setLastName] = useState('');
   const [eventDetails, setEventDetails] = useState(null);
   const [error, setError] = useState('');
+  const [cancelMsg, setCancelMsg] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setEventDetails(null);
+    setCancelMsg('');
 
     try {
       const res = await fetch(`http://localhost:5000/api/guest/event-info/${accessCode}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || 'Invalid access code');
-      if (lastName.trim().toLowerCase() !== data.eventDetails.last_name.toLowerCase()) {
-        throw new Error('Last name does not match');
-      }
-
       setEventDetails(data.eventDetails);
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleCancelRSVP = async () => {
+    setCancelling(true);
+    setCancelMsg('');
+    setError('');
+    try {
+      const res = await fetch('http://localhost:5000/api/guest/cancel-rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_code: accessCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel RSVP');
+      setCancelMsg('Your RSVP has been cancelled.');
+      setEventDetails(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -39,7 +58,7 @@ export default function GuestAccessPage() {
                 <span className="gradient-text">Access Your Invitation</span>
               </h2>
               <p className="text-muted mb-0 fs-5">
-                Enter your <span className="fw-semibold">Access Code</span> and <span className="fw-semibold">Last Name</span> to view your event details.
+                Enter your <span className="fw-semibold">Access Code</span> to view your event details.
               </p>
             </div>
 
@@ -47,7 +66,7 @@ export default function GuestAccessPage() {
               <Card.Body className="p-4">
                 <Form onSubmit={handleSubmit}>
                   <Row className="mb-4">
-                    <Col md={6}>
+                    <Col md={12}>
                       <Form.Group>
                         <Form.Label className="fw-semibold">Access Code</Form.Label>
                         <Form.Control
@@ -57,21 +76,11 @@ export default function GuestAccessPage() {
                           onChange={(e) => setAccessCode(e.target.value)}
                           required
                           className="rounded-pill input-animate"
-                          style={{ background: "#f5f7fa", border: "2px solid #23272b", color: "#121212" }}
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label className="fw-semibold">Last Name</Form.Label>
-                        <Form.Control
-                          type="text"
-                          placeholder="e.g. Gitonga"
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          required
-                          className="rounded-pill input-animate"
-                          style={{ background: "#f5f7fa", border: "2px solid #23272b", color: "#121212" }}
+                          style={{
+                            background: "#f5f7fa",
+                            border: "2px solid #23272b",
+                            color: "#121212"
+                          }}
                         />
                       </Form.Group>
                     </Col>
@@ -95,6 +104,7 @@ export default function GuestAccessPage() {
                 </Form>
 
                 {error && <Alert variant="danger" className="mt-4">{error}</Alert>}
+                {cancelMsg && <Alert variant="success" className="mt-4">{cancelMsg}</Alert>}
               </Card.Body>
             </Card>
 
@@ -123,13 +133,23 @@ export default function GuestAccessPage() {
                       <p>
                         <strong>Check-In:</strong>{" "}
                         {eventDetails.check_in_status ? (
-                          <span className="text-success">✅ Checked In</span>
+                          <span className="text-success"> Checked In</span>
                         ) : (
-                          <span className="text-danger">❌ Not Yet</span>
+                          <span className="text-danger"> Not Yet</span>
                         )}
                       </p>
                     </Col>
                   </Row>
+                  <div className="mt-4 text-end">
+                    <Button
+                      variant="outline-danger"
+                      onClick={handleCancelRSVP}
+                      disabled={cancelling}
+                      className="fw-bold"
+                    >
+                      {cancelling ? "Cancelling..." : "Cancel RSVP"}
+                    </Button>
+                  </div>
                 </Card.Body>
               </Card>
             )}
@@ -165,6 +185,9 @@ export default function GuestAccessPage() {
         .event-info-card .form-label,
         .event-info-card .form-control {
           color: #fff !important;
+        }
+        .event-info-card .form-control {
+          color: #121212 !important; /* Ensure input text stays black */
         }
         .event-details-card {
           border: 2px solid #00e0b8;
@@ -208,4 +231,3 @@ export default function GuestAccessPage() {
     </div>
   );
 }
-            
