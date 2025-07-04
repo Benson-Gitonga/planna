@@ -11,6 +11,8 @@ import {
   Form,
   Modal,
 } from 'react-bootstrap';
+import { FaPaperPlane } from 'react-icons/fa';
+
 
 export default function EventGuestList({ params }) {
   const eventId = params.eventId;
@@ -26,6 +28,9 @@ export default function EventGuestList({ params }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [deletingEmail, setDeletingEmail] = useState(null);
+
+  const [sendingEventId, setSendingEventId] = useState(null);
+  const [invited, setInvited] = useState(false);
 
   const fetchGuests = async () => {
     setLoading(true);
@@ -107,11 +112,53 @@ export default function EventGuestList({ params }) {
     }
   };
 
+  const handleSendInvites = async () => {
+    if (!confirm('Send invites to all guests for this event?')) return;
+
+    setSendingEventId(eventId);
+    try {
+      const res = await fetch(`http://localhost:5000/api/send_invites/${eventId}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert(data.message);
+      setInvited(true);
+    } catch (err) {
+      alert(err.message || 'Failed to send invites');
+    } finally {
+      setSendingEventId(null);
+    }
+  };
+
+  const isPastEvent = () => {
+    if (guests.length === 0) return false;
+    const eventDate = new Date(guests[0].event_date); // assumes at least one guest has event_date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+    return eventDate < today;
+  };
+
   return (
     <Container className="py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="mb-0">Guest List for Event</h5>
-        <Button onClick={() => setShowModal(true)}>Add Guest</Button>
+        <div className="d-flex gap-2">
+          <Button
+              variant={invited ? 'success' : 'outline-success'}
+              onClick={handleSendInvites}
+              disabled={isPastEvent() || sendingEventId === eventId || invited}
+            >
+              <FaPaperPlane className="me-1" />
+              {sendingEventId === eventId ? 'Sending...' : invited ? 'Sent' : 'Send Invites'}
+          </Button>
+
+          <Button variant="primary" onClick={() => setShowModal(true)}>
+            Add Guest
+          </Button>
+        </div>
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
