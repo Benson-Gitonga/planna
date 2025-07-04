@@ -1221,9 +1221,8 @@ app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrgani
   }
 });
 
-// Route to update check-in status when QR code is scanned
 app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async (req, res) => {
-  const { qr_code } = req.body; // This should be the decoded UUID string from the QR scanner
+  const { qr_code } = req.body;
   const organizerId = req.session.user.id;
 
   if (!qr_code) {
@@ -1231,9 +1230,9 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
   }
 
   try {
-    // Retrieve guest and associated event using the access_code (UUID)
+    // Retrieve guest + event info
     const result = await db.query(`
-      SELECT g.guest_id, g.check_in_status, e.organizer_id, e.event_date, e.end_time
+      SELECT g.guest_id, g.check_in_status, e.organizer_id, e.event_date, e.start_time, e.end_time
       FROM guests g
       JOIN events e ON g.event_id = e.event_id
       WHERE g.access_code = $1
@@ -1245,26 +1244,31 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
 
     const guest = result.rows[0];
 
-    // Ensure the guest belongs to an event of this organizer
+    // Ensure the guest is for this organizer
     if (guest.organizer_id !== organizerId) {
       return res.status(403).json({ error: 'Unauthorized: This guest is not from your event' });
     }
 
-    // Check if already checked in
     if (guest.check_in_status === true) {
       return res.status(200).json({ message: 'Guest already checked in' });
     }
 
-    // Construct event end datetime
-    const eventEnd = new Date(`${guest.event_date.toISOString().split('T')[0]}T${guest.end_time}`);
-
-    // Compare with current time
+    // Construct full event start and end datetime
+    const eventDate = guest.event_date.toISOString().split('T')[0];
+    const eventStart = new Date(`${eventDate}T${guest.start_time}`);
+    const eventEnd = new Date(`${eventDate}T${guest.end_time}`);
     const now = new Date();
-    if (now > eventEnd) {
-      return res.status(403).json({ error: 'Check-in not allowed after the event has ended' });
+
+    // Check if now is within the event time window
+    if (now < eventStart) {
+      return res.status(403).json({ error: 'Check-in not allowed before event starts' });
     }
 
-    // Update check-in status
+    if (now > eventEnd) {
+      return res.status(403).json({ error: 'Check-in not allowed after event has ended' });
+    }
+
+    // ✅ Update check-in
     await db.query(`
       UPDATE guests
       SET check_in_status = TRUE
@@ -1277,7 +1281,8 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
     console.error('Check-in error:', err);
     res.status(500).json({ error: 'Failed to check in guest' });
   }
-}); 
+});
+
 //Organizer analytics routes
 
 //Route to obtain the total events created by an organizer
