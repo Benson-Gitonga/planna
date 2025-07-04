@@ -81,7 +81,7 @@ export default function CreateEvent() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create event');
 
-      setToastMessage('🎉 Event created successfully!');
+      setToastMessage(' Event created successfully!');
       setShowToast(true);
 
       // Clear the form

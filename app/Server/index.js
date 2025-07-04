@@ -617,7 +617,7 @@ app.post('/api/rsvp', async (req,res) => {
         const mailOptions = {
             from: `"Planna" <${process.env.EMAIL_USER}>`,
             to: email,
-            subject: `RSVP Confrimation for ${event_name}`,
+            subject: `RSVP Confirmation for ${event_name}`,
             html: `
             <p>Dear ${firstName} ${lastName}</p>  
             <p>Thank you for RSVPing to <strong>${event_name}</strong></p>  
