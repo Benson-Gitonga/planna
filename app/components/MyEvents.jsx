@@ -7,7 +7,7 @@ import {
 } from 'react-bootstrap';
 import ExportCSVButton from './ExportCSVButton';
 import ExportPDFButton from './ExportPdfButton';
-import { FaSortDown, FaSortUp, FaEdit } from 'react-icons/fa';
+import { FaSortDown, FaSortUp, FaEdit, FaTrash } from 'react-icons/fa';
 
 export default function MyEvents() {
   const [events, setEvents] = useState([]);
@@ -87,10 +87,37 @@ export default function MyEvents() {
     setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
   };
 
+  const handleDeleteEvent = async (event) => {
+    const eventDate = new Date(event.event_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+
+    if (eventDate <= today) {
+      alert('You cannot delete an event that is today or has already occurred.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete "${event.event_name}"?`)) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/events/${event.event_id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete event');
+      alert(data.message);
+      fetchEvents();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const sortedEvents = [...events]
     .filter((e) =>
       (e.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.location.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        e.location.toLowerCase().includes(searchTerm.toLowerCase())) &&
       (!statusFilter || determineStatus(e.event_date) === statusFilter)
     )
     .sort((a, b) => {
@@ -120,12 +147,15 @@ export default function MyEvents() {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:5000/api/organizer/edit-event/${selectedEvent.event_id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
+      const res = await fetch(
+        `http://localhost:5000/api/organizer/edit-event/${selectedEvent.event_id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(formData),
+        }
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Update failed');
       setShowModal(false);
@@ -142,7 +172,7 @@ export default function MyEvents() {
         <Col className="text-end">
           <ButtonGroup>
             <ExportCSVButton data={events} filename="events_export.csv" />
-            <ExportPDFButton data={events} filename="events_export.pdf" />
+   
           </ButtonGroup>
         </Col>
       </Row>
@@ -163,11 +193,11 @@ export default function MyEvents() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="shadow-sm rounded-pill"
           >
-            <option value="">🗂️ Filter by Status</option>
-            <option value="Today">✅ Today</option>
-            <option value="This Week">📆 This Week</option>
-            <option value="Upcoming">⏳ Upcoming</option>
-            <option value="Past">📁 Past</option>
+            <option value=""> Filter by Status</option>
+            <option value="Today"> Today</option>
+            <option value="This Week"> This Week</option>
+            <option value="Upcoming"> Upcoming</option>
+            <option value="Past"> Past</option>
           </Form.Select>
         </Col>
       </Row>
@@ -184,13 +214,14 @@ export default function MyEvents() {
             <th>Location</th>
             <th>Time</th>
             <th>Edit</th>
+            <th>Delete</th> {/* New column */}
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan="7"><Spinner animation="border" className="mx-auto d-block my-3" /></td></tr>
+            <tr><td colSpan="8"><Spinner animation="border" className="mx-auto d-block my-3" /></td></tr>
           ) : sortedEvents.length === 0 ? (
-            <tr><td colSpan="7" className="text-center">No matching events.</td></tr>
+            <tr><td colSpan="8" className="text-center">No matching events.</td></tr>
           ) : (
             currentEvents.map((event, idx) => (
               <tr key={event.event_id}>
@@ -203,6 +234,15 @@ export default function MyEvents() {
                 <td>
                   <Button variant="outline-primary" size="sm" onClick={() => openEditModal(event)}>
                     <FaEdit />
+                  </Button>
+                </td>
+                <td>
+                  <Button
+                    variant="outline-danger"
+                    size="sm"
+                    onClick={() => handleDeleteEvent(event)}
+                  >
+                    <FaTrash />
                   </Button>
                 </td>
               </tr>

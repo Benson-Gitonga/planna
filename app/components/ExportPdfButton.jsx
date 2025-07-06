@@ -4,15 +4,20 @@ import { Button } from 'react-bootstrap';
 import { FaFilePdf } from 'react-icons/fa';
 
 export default function ExportPDFButton({
-  data,
+  data = [],
   filename = 'export.pdf',
   title = 'Exported Data',
   columns = [],
-  mapRow = () => [],
+  mapRow = (item) => [],
 }) {
   const handleExport = async () => {
     const { default: jsPDF } = await import('jspdf');
     const autoTable = (await import('jspdf-autotable')).default;
+
+    if (!data.length) {
+      alert('No data to export');
+      return;
+    }
 
     const doc = new jsPDF();
     doc.setFontSize(18);
@@ -24,6 +29,9 @@ export default function ExportPDFButton({
       head: [columns],
       body: tableRows,
       startY: 30,
+      styles: {
+        fontSize: 10,
+      },
     });
 
     doc.save(filename);

@@ -1,8 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Table, Button, Container, Row, Col, Alert, Spinner, Form, InputGroup } from 'react-bootstrap';
-import { FaSearch } from 'react-icons/fa';
+import {
+  Table, Button, Container, Row, Col, Alert, Spinner,
+  Form, InputGroup, Pagination
+} from 'react-bootstrap';
+import { FaSearch, FaTrash } from 'react-icons/fa';
+
+const ITEMS_PER_PAGE = 5;
 
 const EventTable = ({ events }) => {
   const [loading, setLoading] = useState(true);
@@ -10,10 +15,11 @@ const EventTable = ({ events }) => {
   const [eventList, setEventList] = useState([]);
   const [search, setSearch] = useState('');
   const [filteredEvents, setFilteredEvents] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    if (!events) {
-      setError('Failed to load events');
+    if (!events || events.length === 0) {
+      setError('No events available');
       setLoading(false);
     } else {
       setEventList(events);
@@ -28,6 +34,7 @@ const EventTable = ({ events }) => {
         .includes(search.toLowerCase())
     );
     setFilteredEvents(filtered);
+    setCurrentPage(1); // Reset to first page when filtering
   }, [search, eventList]);
 
   const handleDelete = async (eventId) => {
@@ -41,10 +48,7 @@ const EventTable = ({ events }) => {
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to delete event');
-      }
+      if (!response.ok) throw new Error(data?.error || 'Failed to delete event');
 
       const updatedList = eventList.filter((event) => event.event_id !== eventId);
       setEventList(updatedList);
@@ -52,6 +56,12 @@ const EventTable = ({ events }) => {
       setError(err.message);
     }
   };
+
+  const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
+  const currentEvents = filteredEvents.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <Container>
@@ -71,54 +81,82 @@ const EventTable = ({ events }) => {
               </InputGroup>
             </div>
           </div>
+
           {error && <Alert variant="danger">{error}</Alert>}
           {loading ? (
             <Spinner animation="border" />
           ) : (
-            <Table striped bordered hover responsive className="shadow-sm">
-              <thead className="table-dark">
-                <tr>
-                  <th>Name</th>
-                  <th>Date</th>
-                  <th>Location</th>
-                  <th>Start Time</th>
-                  <th>End Time</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEvents.length === 0 ? (
+            <>
+              <Table striped bordered hover responsive className="shadow-sm">
+                <thead className="table-dark">
                   <tr>
-                    <td colSpan="6" className="text-center text-muted">
-                      No events available.
-                    </td>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Location</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Actions</th>
                   </tr>
-                ) : (
-                  filteredEvents.map((event) => (
-                    <tr key={event.event_id}>
-                      <td>{event.event_name}</td>
-                      <td>{new Date(event.event_date).toLocaleDateString()}</td>
-                      <td>{event.location}</td>
-                      <td>{event.start_time}</td>
-                      <td>{event.end_time}</td>
-                      <td>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleDelete(event.event_id)}
-                        >
-                          Delete
-                        </Button>
+                </thead>
+                <tbody>
+                  {currentEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="text-center text-muted">
+                        No events found.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </Table>
+                  ) : (
+                    currentEvents.map((event) => (
+                      <tr key={event.event_id}>
+                        <td>{event.event_name}</td>
+                        <td>{new Date(event.event_date).toLocaleDateString()}</td>
+                        <td>{event.location}</td>
+                        <td>{event.start_time}</td>
+                        <td>{event.end_time}</td>
+                        <td>
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => handleDelete(event.event_id)}
+                            title="Delete Event"
+                          >
+                            <FaTrash />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <Pagination className="justify-content-center">
+                  <Pagination.Prev
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  />
+                  {[...Array(totalPages)].map((_, index) => (
+                    <Pagination.Item
+                      key={index}
+                      active={currentPage === index + 1}
+                      onClick={() => setCurrentPage(index + 1)}
+                    >
+                      {index + 1}
+                    </Pagination.Item>
+                  ))}
+                  <Pagination.Next
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  />
+                </Pagination>
+              )}
+            </>
           )}
         </Col>
       </Row>
     </Container>
   );
 };
+
 export default EventTable;

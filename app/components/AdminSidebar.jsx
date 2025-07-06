@@ -1,7 +1,8 @@
 'use client';
 
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 const navItems = [
   { label: 'Dashboard', icon: 'bi-speedometer2', link: '/admin' },
@@ -11,9 +12,10 @@ const navItems = [
   { label: 'Statistics', icon: 'bi-bar-chart-line', link: '/admin/statistics' },
 ];
 
-export default function AdminSidebar({ open, setOpen }) {
-  const pathname = usePathname();
+const AdminSidebar = () => {
+  const [open, setOpen] = useState(false); // collapsed by default
   const router = useRouter();
+  const pathname = usePathname();
 
   const toggleSidebar = () => setOpen((prev) => !prev);
 
@@ -39,19 +41,10 @@ export default function AdminSidebar({ open, setOpen }) {
         onClick={toggleSidebar}
         style={toggleButtonStyle(open)}
         aria-label="Toggle sidebar"
+        title={open ? "Collapse sidebar" : "Expand sidebar"}
       >
         <i className={`bi ${open ? 'bi-chevron-left' : 'bi-chevron-right'}`} style={{ fontSize: 22 }} />
       </button>
-
-      <h4 className="text-white mb-4" style={{
-        marginLeft: open ? 24 : 0,
-        fontSize: open ? 22 : 0,
-        height: open ? 'auto' : 0,
-        opacity: open ? 1 : 0,
-        transition: 'all 0.3s'
-      }}>
-        Admin Panel
-      </h4>
 
       <ul style={listStyle}>
         {navItems.map(({ label, icon, link }) => (
@@ -72,13 +65,14 @@ export default function AdminSidebar({ open, setOpen }) {
           </li>
         ))}
 
+        {/* 🚪 Logout */}
         <li style={listItemStyle(open)} className="sidebar-item" onClick={handleLogout}>
           <div style={{
             ...linkStyle,
             background: '#d9534f',
             color: '#fff',
             fontWeight: 600,
-            borderRadius: 8
+            borderRadius: 8,
           }}>
             <i className="bi bi-box-arrow-right" style={iconStyle}></i>
             {open && <span>Logout</span>}
@@ -90,23 +84,16 @@ export default function AdminSidebar({ open, setOpen }) {
         .sidebar-item:hover {
           background: #23272b;
           color: #00e0b8 !important;
-          transform: scale(1.06);
-          box-shadow: 0 2px 12px rgba(0,224,184,0.10);
-        } 
+        }
         .sidebar-item:hover i {
           color: #00e0b8 !important;
-        }
-        .sidebar-item {
-          transition:
-            background 0.2s,
-            color 0.2s,
-            transform 0.18s cubic-bezier(.4,1.3,.6,1),
-            box-shadow 0.18s cubic-bezier(.4,1.3,.6,1);
         }
       `}</style>
     </div>
   );
-}
+};
+
+export default AdminSidebar;
 
 // --- Styles ---
 const sidebarStyle = (open) => ({
@@ -118,7 +105,8 @@ const sidebarStyle = (open) => ({
   position: 'fixed',
   top: 0,
   left: 0,
-  paddingTop: '1rem',
+  paddingTop: '0.5rem',
+  boxShadow: '2px 0 10px rgba(0,0,0,0.15)',
   display: 'flex',
   flexDirection: 'column',
   alignItems: open ? 'flex-start' : 'center',
@@ -133,6 +121,7 @@ const toggleButtonStyle = (open) => ({
   cursor: 'pointer',
   alignSelf: open ? 'flex-end' : 'center',
   paddingRight: open ? '1rem' : 0,
+  transition: 'all 0.3s',
 });
 
 const listStyle = {
@@ -145,11 +134,14 @@ const listItemStyle = (open) => ({
   display: 'flex',
   alignItems: 'center',
   padding: open ? '12px 20px' : '12px 0',
+  transition: 'all 0.2s',
+  cursor: 'pointer',
   justifyContent: open ? 'flex-start' : 'center',
   color: '#fff',
   width: '100%',
   borderRadius: '8px',
   marginBottom: 4,
+  position: 'relative',
 });
 
 const linkStyle = {
@@ -164,4 +156,5 @@ const iconStyle = {
   fontSize: 20,
   minWidth: 24,
   marginRight: 16,
+  transition: 'margin 0.3s',
 };

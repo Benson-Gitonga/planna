@@ -561,31 +561,55 @@ app.get('/api/events', requireLogin, requireOrganizer, async (req,res) => {
     }
 })
 
-//Route to allow the event organizers to delete an event
-app.delete('/api/events/:eventId', requireLogin, requireOrganizer, async (req,res) => {
-    const eventId = req.params.eventId;
-    const organizerId = req.session.user.id;
-    try{
-        //Check if the event exists and belongs to the current organizer
-        const eventCheck = await db.query('SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
-        if(eventCheck.rows.length === 0){
-            //If the event does not exists or does not belong to the organizer, return an error
-            return res.status(403).json({
-                error: 'Unauthorized to delete this event or event not found'
-            })        
-        }
-        //Delete the event from the database
-        await db.query('DELETE FROM events WHERE event_id = $1 AND organizer_id = $2', [eventId, organizerId]);
-        res.status(200).json({
-            message: `Event ${eventName} deleted successfully!`
-        })
-    }catch(err){
-        console.error('Error deleting event:', err);
-        res.status(500).json({
-            error: 'Internal server error'
-        })
+// Route to allow the event organizers to delete an event
+app.delete('/api/events/:eventId', requireLogin, requireOrganizer, async (req, res) => {
+  const eventId = req.params.eventId;
+  const organizerId = req.session.user.id;
+
+  try {
+    // Check if the event exists and belongs to the current organizer
+    const eventCheck = await db.query(
+      'SELECT * FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(403).json({
+        error: 'Unauthorized to delete this event or event not found'
+      });
     }
-})
+
+    const event = eventCheck.rows[0];
+    const eventDate = new Date(event.event_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+
+    // Disallow deletion if the event is today or in the past
+    if (eventDate <= today) {
+      return res.status(400).json({
+        error: 'Cannot delete an event that is today or has already occurred'
+      });
+    }
+
+    // Proceed to delete the event
+    await db.query(
+      'DELETE FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    res.status(200).json({
+      message: `Event "${event.event_name}" deleted successfully!`
+    });
+
+  } catch (err) {
+    console.error('Error deleting event:', err);
+    res.status(500).json({
+      error: 'Internal server error'
+    });
+  }
+});
+
 
 //Route to get all the events that have been created in the application
 app.get('/api/all-events', async (req,res) => {
@@ -1319,6 +1343,7 @@ app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrgani
   }
 });
 
+// ✅ Check-in guest endpoint with correct datetime comparison
 app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async (req, res) => {
   const { qr_code } = req.body;
   const organizerId = req.session.user.id;
@@ -1351,13 +1376,20 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
       return res.status(200).json({ message: 'Guest already checked in' });
     }
 
-    // Construct full event start and end datetime
-    const eventDate = guest.event_date.toISOString().split('T')[0];
-    const eventStart = new Date(`${eventDate}T${guest.start_time}`);
-    const eventEnd = new Date(`${eventDate}T${guest.end_time}`);
+    //  Construct eventStart and eventEnd using local time
+    const eventDate = new Date(guest.event_date);
+    const [startHour, startMinute] = guest.start_time.split(':');
+    const [endHour, endMinute] = guest.end_time.split(':');
+
+    const eventStart = new Date(eventDate);
+    eventStart.setHours(+startHour, +startMinute, 0, 0);
+
+    const eventEnd = new Date(eventDate);
+    eventEnd.setHours(+endHour, +endMinute, 0, 0);
+
     const now = new Date();
 
-    // Check if now is within the event time window
+    //  Check if now is within the event time window
     if (now < eventStart) {
       return res.status(403).json({ error: 'Check-in not allowed before event starts' });
     }
@@ -1366,7 +1398,7 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
       return res.status(403).json({ error: 'Check-in not allowed after event has ended' });
     }
 
-    // ✅ Update check-in
+    // Update check-in
     await db.query(`
       UPDATE guests
       SET check_in_status = TRUE
@@ -1380,6 +1412,7 @@ app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async 
     res.status(500).json({ error: 'Failed to check in guest' });
   }
 });
+
 
 //Organizer analytics routes
 
@@ -1729,64 +1762,88 @@ app.get('/api/guest/event-info/:accessCode', async (req,res) => {
     }
 });
 
-//Route to allow guest to cancel their RSVP
-app.post('/api/guest/cancel-rsvp', async (req,res) => {
-    const {access_code} = req.body;
-    if(!access_code){
-        return res.status(400).json({
-            error: 'Access code required'
-        });
-    }
-    try{
-        const result = await db.query(`
-            SELECT g.guest_id, g.email_address, g.first_name, g.last_name, e.event_name
-            FROM guests g
-            JOIN events e ON g.event_id = e.event_id
-            WHERE g.access_code = $1            
-            `, [access_code]);
-            if(result.rows.length === 0){
-                return res.status(404).json({
-                    error: 'Invalid access code'
-                });
-            }
-            const guest = result.rows[0];
-            //Update RSVP status
-            await db.query(`
-                UPDATE guests SET rsvp_status = 'declined' WHERE access_code = $1                
-                `, [access_code]);
-            //Send cancellation email
-            const transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth:{
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASSWORD
-                }
-            });
-            const mailOptions = {
-                from: `"Planna" <${process.env.EMAIL_USER}>`,
-                to: guest.email_address,
-                subject: `RSVP Cancellation for ${guest.event_name}`,
-                html: `
-                    <p>Dear ${guest.first_name},</p>
-                    <p>We have received your request to cancel your RSVP for the event <strong>${guest.event_name}</strong>.</p>
-                    <p>Your RSVP has been successfully cancelled.</p>
-                    <p>Thank you for letting us know!</p>
-                    <p>Best regards,<br>Planna Team</p>                     
-                `
-            };
-            await transporter.sendMail(mailOptions);
-            res.status(200).json({
-                message: ''
-            })
+//Route to allow a guest to cancel their rsvp using their access code
+app.post('/api/guest/cancel-rsvp', async (req, res) => {
+  const { access_code } = req.body;
 
+  if (!access_code) {
+    return res.status(400).json({
+      error: 'Access code required',
+    });
+  }
 
-    }catch(err){
-        console.error('RSVP cancellation error:', err);
-        res.status(500).json({
-            error: 'Failed to cancel RSVP'
-        })
+  try {
+    const result = await db.query(`
+      SELECT g.guest_id, g.email_address, g.first_name, g.last_name, e.event_name, e.event_date
+      FROM guests g
+      JOIN events e ON g.event_id = e.event_id
+      WHERE g.access_code = $1
+    `, [access_code]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Invalid access code',
+      });
     }
+
+    const guest = result.rows[0];
+
+    //  Prevent cancellation on or after the event date
+    const eventDate = new Date(guest.event_date);
+    const today = new Date();
+
+    // Normalize both to dates only
+    eventDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    if (eventDate.getTime() <= today.getTime()) {
+      return res.status(403).json({
+        error: 'RSVP cannot be cancelled on or after the event date.',
+      });
+    }
+
+    //  Update RSVP status
+    await db.query(`
+      UPDATE guests SET rsvp_status = 'declined' WHERE access_code = $1
+    `, [access_code]);
+
+    //  Send cancellation email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Planna" <${process.env.EMAIL_USER}>`,
+      to: guest.email_address,
+      subject: `RSVP Cancellation for ${guest.event_name}`,
+      html: `
+        <p>Dear ${guest.first_name},</p>
+        <p>We have received your request to cancel your RSVP for the event <strong>${guest.event_name}</strong>.</p>
+        <p>Your RSVP has been successfully cancelled.</p>
+        <p>Thank you for letting us know!</p>
+        <p>Best regards,<br>Planna Team</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      message: 'RSVP cancelled successfully.',
+    });
+
+  } catch (err) {
+    console.error('RSVP cancellation error:', err);
+    res.status(500).json({
+      error: 'Failed to cancel RSVP',
+    });
+  }
 });
+
+
 
 
 

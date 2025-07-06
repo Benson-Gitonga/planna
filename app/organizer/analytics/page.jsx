@@ -9,7 +9,7 @@ import AttendanceRateCard from '../../components/OrganizerAttendanceRateCard'
 export default function OrganizerAnalyticsPage() {
   return (
     <Container className="py-4">
-      <h4 className="mb-4 fw-bold">📊 Organizer Analytics</h4>
+      <h4 className="mb-4 fw-bold">Organizer Analytics</h4>
 
       <Row className="mb-4">
         <Col md={6} lg={4}><TotalEventsCard /></Col>
