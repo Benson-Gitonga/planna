@@ -82,9 +82,7 @@ export default function UploadCsvForm() {
       if (!res.ok) throw new Error(data.error || 'Upload failed');
 
       setSuccess(`Uploaded ${data.totalInserted} guests.`);
-      if (data.failedRows?.length) {
-        setSuccess((prev) => prev + ` ${data.failedRows.length} rows failed.`);
-      }
+      
 
       setFile(null);
       setShowProgress(true);

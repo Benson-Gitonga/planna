@@ -423,7 +423,7 @@ app.put('/api/organizer/edit-event/:eventId', requireLogin, requireOrganizer, as
     today.setHours(0, 0, 0, 0);
     const eventDay = new Date(eventDate);
     if (eventDay < today) {
-        return res.status(400).json({ error: 'Event date cannot be in the past' });
+        return res.status(400).json({ error: 'You can only edit future events' });
     }
 
     // Validate time logic (handle overnight events)
@@ -585,12 +585,6 @@ app.delete('/api/events/:eventId', requireLogin, requireOrganizer, async (req, r
     today.setHours(0, 0, 0, 0);
     eventDate.setHours(0, 0, 0, 0);
 
-    // Disallow deletion if the event is today or in the past
-    if (eventDate <= today) {
-      return res.status(400).json({
-        error: 'Cannot delete an event that is today or has already occurred'
-      });
-    }
 
     // Proceed to delete the event
     await db.query(
@@ -1343,7 +1337,7 @@ app.post('/api/organizer/send-final-email/:eventId', requireLogin, requireOrgani
   }
 });
 
-// ✅ Check-in guest endpoint with correct datetime comparison
+//  Check-in guest endpoint with correct datetime comparison
 app.post('/api/organizer/check-in-guest', requireLogin, requireOrganizer, async (req, res) => {
   const { qr_code } = req.body;
   const organizerId = req.session.user.id;
